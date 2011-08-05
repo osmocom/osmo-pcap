@@ -23,7 +23,7 @@
 #include <osmo-pcap/osmo_pcap_client.h>
 #include <osmo-pcap/common.h>
 
-#include <osmocom/core/talloc.h>
+#include <osmocore/talloc.h>
 
 #include <stdlib.h>
 

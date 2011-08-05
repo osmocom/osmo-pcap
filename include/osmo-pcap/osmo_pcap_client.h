@@ -23,9 +23,9 @@
 #include <inttypes.h>
 #include <pcap.h>
 
-#include <osmocom/core/select.h>
-#include <osmocom/core/timer.h>
-#include <osmocom/core/write_queue.h>
+#include <osmocore/select.h>
+#include <osmocore/timer.h>
+#include <osmocore/write_queue.h>
 
 
 struct osmo_pcap_client {
@@ -36,12 +36,12 @@ struct osmo_pcap_client {
 	struct bpf_program bpf;
 	char   *filter_string;
 	int filter_itself;
-	struct osmo_fd fd;
+	struct bsc_fd fd;
 
 	char *srv_ip;
 	int srv_port;
-	struct osmo_wqueue wqueue;
-	struct osmo_timer_list timer;
+	struct write_queue wqueue;
+	struct timer_list timer;
 };
 
 extern struct osmo_pcap_client *pcap_client;

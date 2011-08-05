@@ -15,8 +15,8 @@ AC_PROG_INSTALL
 AC_PROG_RANLIB
 
 dnl checks for libraries
-PKG_CHECK_MODULES(LIBOSMOCORE, libosmocore >= 0.3.2)
-PKG_CHECK_MODULES(LIBOSMOVTY, libosmovty >= 0.3.0)
+PKG_CHECK_MODULES(LIBOSMOCORE, libosmocore < 0.2.0)
+PKG_CHECK_MODULES(LIBOSMOVTY, libosmovty < 0.2.0)
 
 dnl checks for header files
 AC_HEADER_STDC

@@ -24,9 +24,8 @@
 #include <osmo-pcap/common.h>
 #include <osmo-pcap/wireformat.h>
 
-#include <osmocom/core/msgb.h>
-#include <osmocom/core/select.h>
-#include <osmocom/core/socket.h>
+#include <osmocore/msgb.h>
+#include <osmocore/select.h>
 
 #include <arpa/inet.h>
 
@@ -37,6 +36,97 @@
 #include <string.h>
 #include <unistd.h>
 
+
+#include <sys/ioctl.h>
+#include <sys/types.h>
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <string.h>
+#include <errno.h>
+#include <netdb.h>
+#include <ifaddrs.h>
+
+#define OSMO_SOCK_F_CONNECT	(1 << 0)
+#define OSMO_SOCK_F_BIND	(1 << 1)
+#define OSMO_SOCK_F_NONBLOCK	(1 << 2)
+int osmo_sock_init(uint16_t family, uint16_t type, uint8_t proto,
+		   const char *host, uint16_t port, unsigned int flags)
+{
+	struct addrinfo hints, *result, *rp;
+	int sfd, rc, on = 1;
+	char portbuf[16];
+
+	if ((flags & (OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT)) ==
+		     (OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT))
+		return -EINVAL;
+
+	sprintf(portbuf, "%u", port);
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = family;
+	hints.ai_socktype = type;
+	hints.ai_flags = 0;
+	hints.ai_protocol = proto;
+
+	if (flags & OSMO_SOCK_F_BIND)
+		hints.ai_flags |= AI_PASSIVE;
+
+	rc = getaddrinfo(host, portbuf, &hints, &result);
+	if (rc != 0) {
+		perror("getaddrinfo returned NULL");
+		return -EINVAL;
+	}
+
+	for (rp = result; rp != NULL; rp = rp->ai_next) {
+		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (sfd == -1)
+			continue;
+		if (flags & OSMO_SOCK_F_NONBLOCK) {
+			if (ioctl(sfd, FIONBIO, (unsigned char *)&on) < 0) {
+				perror("cannot set this socket unblocking");
+				close(sfd);
+				return -EINVAL;
+			}
+		}
+		if (flags & OSMO_SOCK_F_CONNECT) {
+			rc = connect(sfd, rp->ai_addr, rp->ai_addrlen);
+			if (rc != -1 || (rc == -1 && errno == EINPROGRESS))
+				break;
+		} else {
+			rc = setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR,
+							&on, sizeof(on));
+			if (rc < 0) {
+				perror("cannot setsockopt socket");
+				break;
+			}
+			if (bind(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
+				break;
+		}
+		close(sfd);
+	}
+	freeaddrinfo(result);
+
+	if (rp == NULL) {
+		perror("unable to connect/bind socket");
+		return -ENODEV;
+	}
+
+	setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+	/* Make sure to call 'listen' on a bound, connection-oriented sock */
+	if (flags & OSMO_SOCK_F_BIND) {
+		switch (type) {
+		case SOCK_STREAM:
+		case SOCK_SEQPACKET:
+			listen(sfd, 10);
+			break;
+		}
+	}
+	return sfd;
+}
+
+
 static void _osmo_client_connect(void *_data)
 {
 	osmo_client_connect((struct osmo_pcap_client *) _data);
@@ -45,7 +135,7 @@ static void _osmo_client_connect(void *_data)
 static void lost_connection(struct osmo_pcap_client *client)
 {
 	if (client->wqueue.bfd.fd >= 0) {
-		osmo_fd_unregister(&client->wqueue.bfd);
+		bsc_unregister_fd(&client->wqueue.bfd);
 		close(client->wqueue.bfd.fd);
 		client->wqueue.bfd.fd = -1;
 	}
@@ -53,19 +143,19 @@ static void lost_connection(struct osmo_pcap_client *client)
 
 	client->timer.cb = _osmo_client_connect;
 	client->timer.data = client;
-	osmo_timer_schedule(&client->timer, 2, 0);
+	bsc_schedule_timer(&client->timer, 2, 0);
 }
 
 static void write_data(struct osmo_pcap_client *client, struct msgb *msg)
 {
-	if (osmo_wqueue_enqueue(&client->wqueue, msg) != 0) {
+	if (write_queue_enqueue(&client->wqueue, msg) != 0) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to enqueue.\n");
 		msgb_free(msg);
 		return;
 	}
 }
 
-static int read_cb(struct osmo_fd *fd)
+static int read_cb(struct bsc_fd *fd)
 {
 	char buf[4096];
 	int rc;
@@ -81,7 +171,7 @@ static int read_cb(struct osmo_fd *fd)
 	return 0;
 }
 
-static int write_cb(struct osmo_fd *fd, struct msgb *msg)
+static int write_cb(struct bsc_fd *fd, struct msgb *msg)
 {
 	int rc;
 
@@ -160,7 +250,7 @@ void osmo_client_connect(struct osmo_pcap_client *client)
 	client->wqueue.write_cb = write_cb;
 	client->wqueue.bfd.when = BSC_FD_READ;
 	client->wqueue.bfd.data = client;
-	osmo_wqueue_clear(&client->wqueue);
+	write_queue_clear(&client->wqueue);
 
 	fd = osmo_sock_init(AF_INET, SOCK_STREAM, IPPROTO_TCP,
 			    client->srv_ip, client->srv_port, OSMO_SOCK_F_CONNECT);
@@ -173,7 +263,7 @@ void osmo_client_connect(struct osmo_pcap_client *client)
 	}
 
 	client->wqueue.bfd.fd = fd;
-	if (osmo_fd_register(&client->wqueue.bfd) != 0) {
+	if (bsc_register_fd(&client->wqueue.bfd) != 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
 		     "Failed to register to BFD.\n");
 		lost_connection(client);

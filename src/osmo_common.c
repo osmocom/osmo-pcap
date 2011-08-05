@@ -22,7 +22,7 @@
 
 #include <osmo-pcap/common.h>
 
-#include <osmocom/core/utils.h>
+#include <osmocore/utils.h>
 
 static const struct log_info_cat default_categories[] = {
 	[DPCAP] = {

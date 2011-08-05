@@ -23,7 +23,7 @@
 #ifndef OSMO_PCAP_COMMON_H
 #define OSMO_PCAP_COMMON_H
 
-#include <osmocom/core/logging.h>
+#include <osmocore/logging.h>
 
 #include <osmocom/vty/vty.h>
 #include <osmocom/vty/buffer.h>

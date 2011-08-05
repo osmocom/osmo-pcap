@@ -23,7 +23,7 @@
 #include <osmo-pcap/osmo_pcap_client.h>
 #include <osmo-pcap/common.h>
 
-#include <osmocom/core/talloc.h>
+#include <osmocore/talloc.h>
 
 #include <limits.h>
 
@@ -32,7 +32,7 @@
 #endif
 
 
-static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
+static int pcap_read_cb(struct bsc_fd *fd, unsigned int what)
 {
 	struct osmo_pcap_client *client = fd->data;
 	struct pcap_pkthdr hdr;
@@ -86,7 +86,7 @@ static void free_all(struct osmo_pcap_client *client)
 	pcap_freecode(&client->bpf);
 
 	if (client->fd.fd >= 0) {
-		osmo_fd_unregister(&client->fd);
+		bsc_unregister_fd(&client->fd);
 		client->fd.fd = -1;
 	}
 
@@ -127,7 +127,7 @@ int osmo_client_capture(struct osmo_pcap_client *client, const char *device)
 	client->fd.when = BSC_FD_READ;
 	client->fd.cb = pcap_read_cb;
 	client->fd.data = client;
-	if (osmo_fd_register(&client->fd) != 0) {
+	if (bsc_register_fd(&client->fd) != 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
 		     "Failed to register the fd.\n");
 		client->fd.fd = -1;

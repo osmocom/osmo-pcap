@@ -23,11 +23,10 @@
 #include <osmo-pcap/common.h>
 #include <osmo-pcap/osmo_pcap_client.h>
 
-#include <osmocom/core/application.h>
-#include <osmocom/core/process.h>
-#include <osmocom/core/rate_ctr.h>
-#include <osmocom/core/select.h>
-#include <osmocom/core/talloc.h>
+#include <osmocore/process.h>
+#include <osmocore/rate_ctr.h>
+#include <osmocore/select.h>
+#include <osmocore/talloc.h>
 
 #include <osmocom/vty/logging.h>
 #include <osmocom/vty/telnet_interface.h>
@@ -43,13 +42,38 @@
 
 #include "osmopcapconfig.h"
 
+
 static const char *config_file = "osmo-pcap-client.cfg";
 static int daemonize = 0;
+static struct log_target *stderr_target = NULL;
 
 void *tall_bsc_ctx;
 struct osmo_pcap_client *pcap_client;
 extern void *tall_msgb_ctx;
 extern void *tall_ctr_ctx;
+
+
+/* drop in */
+static void osmo_init_ignore_signals(void)
+{
+        /* Signals that by default would terminate */
+        signal(SIGPIPE, SIG_IGN);
+        signal(SIGALRM, SIG_IGN);
+        signal(SIGHUP, SIG_IGN);
+        signal(SIGIO, SIG_IGN);
+}
+
+static int osmo_init_logging(const struct log_info *log_info)
+{
+        log_init(log_info);
+        stderr_target = log_target_create_stderr();
+        if (!stderr_target)
+                return -1;
+
+        log_add_target(stderr_target);
+        log_set_all_filter(stderr_target, 1);
+        return 0;
+}
 
 static struct vty_app_info vty_info = {
 	.name		= "OsmoPCAPClient",
@@ -104,16 +128,16 @@ static void handle_options(int argc, char **argv)
 			daemonize = 1;
 			break;
 		case 'd':
-			log_parse_category_mask(osmo_stderr_target, optarg);
+			log_parse_category_mask(stderr_target, optarg);
 			break;
 		case 's':
-			log_set_use_color(osmo_stderr_target, 0);
+			log_set_use_color(stderr_target, 0);
 			break;
 		case 'T':
-			log_set_print_timestamp(osmo_stderr_target, 1);
+			log_set_print_timestamp(stderr_target, 1);
 			break;
 		case 'e':
-			log_set_log_level(osmo_stderr_target, atoi(optarg));
+			log_set_log_level(stderr_target, atoi(optarg));
 			break;
 		case 'c':
 			config_file = strdup(optarg);
@@ -161,7 +185,7 @@ int main(int argc, char **argv)
 
 	vty_info.copyright = osmopcap_copyright;
 	vty_init(&vty_info);
-	logging_vty_add_cmds(&log_info);
+	logging_vty_add_cmds();
 
 	/* parse options */
 	handle_options(argc, argv);
@@ -188,7 +212,7 @@ int main(int argc, char **argv)
 	vty_client_init(pcap_client);
 
 	/* initialize the queue */
-	osmo_wqueue_init(&pcap_client->wqueue, 10);
+	write_queue_init(&pcap_client->wqueue, 10);
 	pcap_client->wqueue.bfd.fd = -1;
 
 
@@ -210,7 +234,7 @@ int main(int argc, char **argv)
 	}
 
 	while (1) {
-		osmo_select_main(0);
+		bsc_select_main(0);
 	}
 
 	return(0);

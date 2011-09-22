@@ -7,8 +7,8 @@
 # We want to keep the filenames dated and that confuses logrotate,
 # hence this script.
 
-# Method used either AGE or FILES
-METHOD="AGE"
+# Method used - either NAME, CTIME, or FILES
+METHOD="NAME"
 # Maximum age of the logs
 MAXAGE=120
 # Maximum number of logs to keep
@@ -28,11 +28,28 @@ BASEPATH="/var/lib/osmo-pcap/"
 cd "$BASEPATH"
 
 
-do_cleanup_age()
+do_cleanup_ctime()
 {
 	find . -ctime +$MAXAGE -name "trace-$1-*.pcap*" |sort -r | while read LOG; do
 		[ $VERBOSE -eq 1 ] && echo "Deleting file \"$LOG\""
 		rm -f "$LOG"
+	done
+}
+
+do_cleanup_name()
+{
+	CUTOFF=$(date -d "${MAXAGE} days ago" +%Y%m%d)
+	find . -name "trace-$1-*.pcap*" |sort -r | while read LOG; do
+		# Retrieve the date from the filename
+		# We only need day accuracy so ignore the time
+		CURRENT=${LOG%_*}
+		CURRENT=${CURRENT#./trace-$1-}
+
+		# Date is before the cutoff date, delete
+		if [ $CURRENT -lt $CUTOFF ]; then
+			[ $VERBOSE -eq 1 ] && echo "Deleting file \"$LOG\""
+			rm -f "$LOG"
+		fi
 	done
 }
 
@@ -67,12 +84,14 @@ find . -name "trace-*.pcap*" |sed -n -e "s/.*trace-\(.\+\)-[0-9]\{8\}_[0-9]\{6\}
 
 	[ $VERBOSE -eq 1 ] && echo "Cleaning logs for $CLIENT"
 
-	if [ "x$METHOD" == "xAGE" ]; then
-		do_cleanup_age "$CLIENT"
+	if [ "x$METHOD" == "xNAME" ]; then
+		do_cleanup_name "$CLIENT"
+	elif [ "x$METHOD" == "xCTIME" ]; then
+		do_cleanup_ctime "$CLIENT"
 	elif [ "x$METHOD" == "xFILES" ]; then
 		do_cleanup_files "$CLIENT"
 	else
-		echo "Error, set METHOD to AGE or FILES"
+		echo "Error, set METHOD to NAME, CTIME or FILES"
 		exit 1
 	fi
 

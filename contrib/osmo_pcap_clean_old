@@ -30,7 +30,7 @@ cd "$BASEPATH"
 
 do_cleanup_age()
 {
-	find . -ctime +$MAXAGE -name "trace-$1*" |sort -r | while read LOG; do
+	find . -ctime +$MAXAGE -name "trace-$1-*.pcap*" |sort -r | while read LOG; do
 		[ $VERBOSE -eq 1 ] && echo "Deleting file \"$LOG\""
 		rm -f "$LOG"
 	done
@@ -39,7 +39,7 @@ do_cleanup_age()
 do_cleanup_files()
 {
 	i=1
-	find . -name "trace-$1*" |sort -r | while read LOG; do
+	find . -name "trace-$1-*.pcap*" |sort -r | while read LOG; do
 		if [ $i -gt $MAXFILES ]; then
 			[ $VERBOSE -eq 1 ] && echo "Deleting file \"$LOG\""
 			rm -f "$LOG"
@@ -51,7 +51,7 @@ do_cleanup_files()
 do_zip()
 {
 	i=1
-	find . -name "trace-$1*" |sort -r | while read LOG; do
+	find . -name "trace-$1-*.pcap*" |sort -r | while read LOG; do
 		if [ $i -gt $ZIPAFTER ]; then
 				if [ "${LOG##*.}" != "gz" ]; then
 					[ $VERBOSE -eq 1 ] && echo "Compressing file \"$LOG\""
@@ -62,7 +62,9 @@ do_zip()
 	done
 }
 
-find . -name "trace-*" |sed -e "s/.*trace-\(.*\)-\(.*\).pcap.*/\1/" |sort |uniq | while read CLIENT; do
+# Use an explicit pattern here
+find . -name "trace-*.pcap*" |sed -n -e "s/.*trace-\(.\+\)-[0-9]\{8\}_[0-9]\{6\}\.pcap\(\..\+\)\?/\1/p" |sort |uniq | while read CLIENT; do
+
 	[ $VERBOSE -eq 1 ] && echo "Cleaning logs for $CLIENT"
 
 	if [ "x$METHOD" == "xAGE" ]; then

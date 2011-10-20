@@ -80,7 +80,7 @@ do_zip()
 }
 
 # Use an explicit pattern here
-find . -name "trace-*.pcap*" |sed -n -e "s/.*trace-\(.\+\)-[0-9]\{8\}_[0-9]\{6\}\.pcap\(\..\+\)\?/\1/p" |sort |uniq | while read CLIENT; do
+find . -name "trace-*.pcap*" |sed -n -re "s/.*trace-(.+)-[0-9]{8}_[0-9]{6}\.pcap(\..+)?/\1/p" |sort |uniq | while read CLIENT; do
 
 	[ $VERBOSE -eq 1 ] && echo "Cleaning logs for $CLIENT"
 

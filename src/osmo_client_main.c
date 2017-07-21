@@ -206,7 +206,7 @@ int main(int argc, char **argv)
 
 	osmo_tls_init();
 
-	rc = telnet_init(tall_bsc_ctx, NULL, 4240);
+	rc = telnet_init(tall_bsc_ctx, NULL, OSMO_VTY_PORT_PCAP_CLIENT);
 	if (rc < 0) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to bind telnet interface\n");
 		exit(1);

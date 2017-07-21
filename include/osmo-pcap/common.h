@@ -28,6 +28,15 @@
 #include <osmocom/vty/vty.h>
 #include <osmocom/vty/buffer.h>
 #include <osmocom/vty/command.h>
+#include <osmocom/vty/ports.h>
+
+/* support old versions of libosmocore */
+#ifndef OSMO_VTY_PORT_PCAP_CLIENT
+#define OSMO_VTY_PORT_PCAP_CLIENT	4237
+#endif
+#ifndef OSMO_VTY_PORT_PCAP_SERVER
+#define OSMO_VTY_PORT_PCAP_SERVER	4238
+#endif
 
 enum {
 	DPCAP,

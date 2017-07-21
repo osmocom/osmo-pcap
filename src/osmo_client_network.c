@@ -43,138 +43,6 @@
 #include <unistd.h>
 
 
-/*
- * Move to libosmocore... if the api makes source
- */
-static int sock_src_init(uint16_t family, uint16_t type, uint8_t proto,
-		   const char *src, uint16_t src_port,
-		   const char *host, uint16_t port, unsigned int flags)
-{
-	struct addrinfo hints, *result, *rp;
-	struct addrinfo *src_result, *src_rp = NULL;
-	int sfd, rc, on = 1;
-	char portbuf[16];
-	char src_portbuf[16];
-
-	sprintf(portbuf, "%u", port);
-	sprintf(src_portbuf, "%u", src_port);
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = family;
-	if (type == SOCK_RAW) {
-		/* Workaround for glibc, that returns EAI_SERVICE (-8) if
-		 * SOCK_RAW and IPPROTO_GRE is used.
-		 */
-		hints.ai_socktype = SOCK_DGRAM;
-		hints.ai_protocol = IPPROTO_UDP;
-	} else {
-		hints.ai_socktype = type;
-		hints.ai_protocol = proto;
-	}
-
-	rc = getaddrinfo(host, portbuf, &hints, &result);
-	if (rc != 0) {
-		fprintf(stderr, "getaddrinfo returned NULL: %s:%u: %s\n",
-			host, port, strerror(errno));
-		return -EINVAL;
-	}
-
-	if (src) {
-		rc = getaddrinfo(src, src_portbuf, &hints, &src_result);
-		if (rc != 0) {
-			fprintf(stderr, "getaddrinfo returned NULL: %s:%u: %s\n",
-				src, src_port, strerror(errno));
-			freeaddrinfo(result);
-			return -EINVAL;
-		}
-
-		/* select an address */
-		for (src_rp = src_result; src_rp != NULL; src_rp = src_rp->ai_next) {
-			/* Workaround for glibc again */
-			if (type == SOCK_RAW) {
-				src_rp->ai_socktype = SOCK_RAW;
-				src_rp->ai_protocol = proto;
-			}
-			break;
-		}
-
-		if (!src_rp) {
-			fprintf(stderr, "Failed to get src: %s:%u %s\n",
-				src, src_port, strerror(errno));
-			freeaddrinfo(result);
-			freeaddrinfo(src_result);
-			return -EINVAL;
-		}
-	}
-
-
-	for (rp = result; rp != NULL; rp = rp->ai_next) {
-		/* Workaround for glibc again */
-		if (type == SOCK_RAW) {
-			rp->ai_socktype = SOCK_RAW;
-			rp->ai_protocol = proto;
-		}
-
-		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if (sfd == -1)
-			continue;
-		if (flags & OSMO_SOCK_F_NONBLOCK) {
-			if (ioctl(sfd, FIONBIO, (unsigned char *)&on) < 0) {
-				fprintf(stderr,
-					"cannot set this socket unblocking:"
-					" %s:%u: %s\n",
-					host, port, strerror(errno));
-				close(sfd);
-				freeaddrinfo(result);
-				return -EINVAL;
-			}
-		}
-
-
-		if (src_rp) {
-			rc = bind(sfd, src_rp->ai_addr, src_rp->ai_addrlen);
-			if (rc != 0) {
-				fprintf(stderr,
-					"cannot bind socket:"
-					" %s:%u: %s\n",
-					src, src_port, strerror(errno));
-				close(sfd);
-				continue;
-			}
-		}
-
-		if (flags & OSMO_SOCK_F_CONNECT) {
-			rc = connect(sfd, rp->ai_addr, rp->ai_addrlen);
-			if (rc != -1 || (rc == -1 && errno == EINPROGRESS))
-				break;
-		} else {
-			rc = setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR,
-							&on, sizeof(on));
-			if (rc < 0) {
-				fprintf(stderr,
-					"cannot setsockopt socket:"
-					" %s:%u: %s\n",
-					host, port, strerror(errno));
-				break;
-			}
-			if (bind(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
-				break;
-		}
-		close(sfd);
-	}
-	freeaddrinfo(result);
-	if (src)
-		freeaddrinfo(src_result);
-
-	if (rp == NULL) {
-		fprintf(stderr, "unable to connect/bind socket: %s:%u: %s\n",
-			host, port, strerror(errno));
-		return -ENODEV;
-	}
-
-	setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-	return sfd;
-}
-
 static void _osmo_client_connect(void *_data)
 {
 	osmo_client_connect((struct osmo_pcap_client_conn *) _data);
@@ -369,10 +237,10 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 	conn->wqueue.bfd.when = BSC_FD_READ;
 	osmo_wqueue_clear(&conn->wqueue);
 
-	fd = sock_src_init(AF_INET, SOCK_STREAM, IPPROTO_TCP,
+	fd = osmo_sock_init2(AF_INET, SOCK_STREAM, IPPROTO_TCP,
 				conn->source_ip, 0,
 				conn->srv_ip, conn->srv_port,
-				OSMO_SOCK_F_CONNECT | OSMO_SOCK_F_NONBLOCK);
+				OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT | OSMO_SOCK_F_NONBLOCK);
 	if (fd < 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
 		     "Failed to connect conn=%s to %s:%d\n",

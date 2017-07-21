@@ -1,7 +1,7 @@
 AM_CPPFLAGS = $(all_includes) -I$(top_srcdir)/include -I$(top_builddir)/
 AM_CFLAGS = -Wall $(LIBOSMOCORE_CFLAGS) $(LIBOSMOVTY_CFLAGS) $(PCAP_CFLAGS) $(LIBGNUTLS_CFLAGS)
 
-bin_PROGRAMS = osmo_pcap_client osmo_pcap_server
+bin_PROGRAMS = osmo-pcap-client osmo-pcap-server
 
 osmo_pcap_client_SOURCES = osmo_client_main.c osmo_common.c \
 			   osmo_client_core.c osmo_client_vty.c \

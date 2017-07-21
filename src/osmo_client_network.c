@@ -162,7 +162,8 @@ static int sock_src_init(uint16_t family, uint16_t type, uint8_t proto,
 		close(sfd);
 	}
 	freeaddrinfo(result);
-	freeaddrinfo(src_result);
+	if (src)
+		freeaddrinfo(src_result);
 
 	if (rp == NULL) {
 		fprintf(stderr, "unable to connect/bind socket: %s:%u: %s\n",

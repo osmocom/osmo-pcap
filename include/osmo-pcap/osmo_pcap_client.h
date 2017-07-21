@@ -46,6 +46,11 @@ enum {
 	CLIENT_CTR_P_IFDROP,
 };
 
+enum osmo_pcap_protocol {
+	PROTOCOL_OSMOPCAP,
+	PROTOCOL_IPIP,
+};
+
 struct osmo_pcap_client_conn {
 	struct llist_head entry;
 	const char *name;
@@ -55,6 +60,7 @@ struct osmo_pcap_client_conn {
 	char *source_ip;
 	struct osmo_wqueue wqueue;
 	struct osmo_timer_list timer;
+	enum osmo_pcap_protocol protocol;
 
 	/* TLS handling */
 	bool tls_on;

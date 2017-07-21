@@ -228,31 +228,22 @@ void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
 
 void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 {
-	int fd;
+	int rc;
 
 	osmo_client_disconnect(conn);
 
 	conn->wqueue.read_cb = read_cb;
 	conn->wqueue.write_cb = write_cb;
-	conn->wqueue.bfd.when = BSC_FD_READ;
 	osmo_wqueue_clear(&conn->wqueue);
 
-	fd = osmo_sock_init2(AF_INET, SOCK_STREAM, IPPROTO_TCP,
+	rc = osmo_sock_init2_ofd(&conn->wqueue.bfd, AF_INET, SOCK_STREAM, IPPROTO_TCP,
 				conn->source_ip, 0,
 				conn->srv_ip, conn->srv_port,
 				OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT | OSMO_SOCK_F_NONBLOCK);
-	if (fd < 0) {
+	if (rc < 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
 		     "Failed to connect conn=%s to %s:%d\n",
 		     conn->name, conn->srv_ip, conn->srv_port);
-		lost_connection(conn);
-		return;
-	}
-
-	conn->wqueue.bfd.fd = fd;
-	if (osmo_fd_register(&conn->wqueue.bfd) != 0) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "Failed to register to BFD conn=%s\n", conn->name);
 		lost_connection(conn);
 		return;
 	}

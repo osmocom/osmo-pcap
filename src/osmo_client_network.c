@@ -150,12 +150,25 @@ int conn_cb(struct osmo_fd *fd, unsigned int what)
 	return 0;
 }
 
+static int get_iphdr_offset(int dlt)
+{
+	switch (dlt) {
+	case DLT_EN10MB:
+		return 14;
+	case DLT_LINUX_SLL:
+		return 16;
+	default:
+		return -1;
+	}
+}
+
 void osmo_client_send_data(struct osmo_pcap_client_conn *conn,
 			   struct pcap_pkthdr *in_hdr, const uint8_t *data)
 {
 	struct osmo_pcap_data *om_hdr;
 	struct osmo_pcap_pkthdr *hdr;
 	struct msgb *msg;
+	int offset, ip_len;
 
 	if (in_hdr->caplen > 9000) {
 		LOGP(DCLIENT, LOGL_ERROR,
@@ -171,22 +184,42 @@ void osmo_client_send_data(struct osmo_pcap_client_conn *conn,
 		return;
 	}
 
-	om_hdr = (struct osmo_pcap_data *) msgb_put(msg, sizeof(*om_hdr));
-	om_hdr->type = PKT_LINK_DATA;
+	switch (conn->protocol) {
+	case PROTOCOL_OSMOPCAP:
+		om_hdr = (struct osmo_pcap_data *) msgb_put(msg, sizeof(*om_hdr));
+		om_hdr->type = PKT_LINK_DATA;
 
-	msg->l2h = msgb_put(msg, sizeof(*hdr));
-	hdr = (struct osmo_pcap_pkthdr *) msg->l2h;
-	hdr->ts_sec = in_hdr->ts.tv_sec;
-	hdr->ts_usec = in_hdr->ts.tv_usec;
-	hdr->caplen = in_hdr->caplen;
-	hdr->len = in_hdr->len;
+		msg->l2h = msgb_put(msg, sizeof(*hdr));
+		hdr = (struct osmo_pcap_pkthdr *) msg->l2h;
+		hdr->ts_sec = in_hdr->ts.tv_sec;
+		hdr->ts_usec = in_hdr->ts.tv_usec;
+		hdr->caplen = in_hdr->caplen;
+		hdr->len = in_hdr->len;
 
-	msg->l3h = msgb_put(msg, in_hdr->caplen);
-	memcpy(msg->l3h, data, in_hdr->caplen);
+		msg->l3h = msgb_put(msg, in_hdr->caplen);
+		memcpy(msg->l3h, data, in_hdr->caplen);
 
-	om_hdr->len = htons(msgb_l2len(msg));
-	rate_ctr_add(&conn->client->ctrg->ctr[CLIENT_CTR_BYTES], hdr->caplen);
-	rate_ctr_inc(&conn->client->ctrg->ctr[CLIENT_CTR_PKTS]);
+		om_hdr->len = htons(msgb_l2len(msg));
+		rate_ctr_add(&conn->client->ctrg->ctr[CLIENT_CTR_BYTES], hdr->caplen);
+		rate_ctr_inc(&conn->client->ctrg->ctr[CLIENT_CTR_PKTS]);
+		break;
+	case PROTOCOL_IPIP:
+		offset = get_iphdr_offset(pcap_datalink(conn->client->handle));
+		if (offset < 0) {
+			msgb_free(msg);
+			return;
+		}
+		ip_len = in_hdr->caplen - offset;
+		if (ip_len < 0) {
+			msgb_free(msg);
+			return;
+		}
+		msg->l2h = msgb_put(msg, ip_len);
+		memcpy(msg->l2h, data+offset, ip_len);
+		break;
+	default:
+		OSMO_ASSERT(0);
+	}
 
 	write_data(conn, msg);
 }
@@ -196,6 +229,10 @@ void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
 	struct pcap_file_header *hdr;
 	struct osmo_pcap_data *om_hdr;
 	struct msgb *msg;
+
+	/* IPIP encapsulation has no linktype header */
+	if (conn->protocol == PROTOCOL_IPIP)
+		return;
 
 	if (!conn->client->handle) {
 		LOGP(DCLIENT, LOGL_ERROR,
@@ -229,6 +266,8 @@ void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
 void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 {
 	int rc;
+	uint16_t srv_port;
+	int sock_type, sock_proto;
 
 	osmo_client_disconnect(conn);
 
@@ -236,9 +275,25 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 	conn->wqueue.write_cb = write_cb;
 	osmo_wqueue_clear(&conn->wqueue);
 
-	rc = osmo_sock_init2_ofd(&conn->wqueue.bfd, AF_INET, SOCK_STREAM, IPPROTO_TCP,
-				conn->source_ip, 0,
-				conn->srv_ip, conn->srv_port,
+	switch (conn->protocol) {
+	case PROTOCOL_OSMOPCAP:
+		srv_port = conn->srv_port;
+		sock_type = SOCK_STREAM;
+		sock_proto = IPPROTO_TCP;
+		break;
+	case PROTOCOL_IPIP:
+		srv_port = 0;
+		sock_type = SOCK_RAW;
+		sock_proto = IPPROTO_IPIP;
+		conn->wqueue.bfd.when = BSC_FD_WRITE;
+		break;
+	default:
+		OSMO_ASSERT(0);
+		break;
+	}
+
+	rc = osmo_sock_init2_ofd(&conn->wqueue.bfd, AF_INET, sock_type, sock_proto,
+				conn->source_ip, 0, conn->srv_ip, srv_port,
 				OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT | OSMO_SOCK_F_NONBLOCK);
 	if (rc < 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
@@ -251,7 +306,10 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 	rate_ctr_inc(&conn->client->ctrg->ctr[CLIENT_CTR_CONNECT]);
 	conn->wqueue.bfd.cb = conn_cb;
 	conn->wqueue.bfd.data = conn;
-	conn->wqueue.bfd.when = BSC_FD_READ | BSC_FD_WRITE;
+	if (conn->protocol == PROTOCOL_IPIP)
+		conn->wqueue.bfd.when = BSC_FD_WRITE;
+	else
+		conn->wqueue.bfd.when = BSC_FD_READ | BSC_FD_WRITE;
 }
 
 void osmo_client_reconnect(struct osmo_pcap_client_conn *conn)

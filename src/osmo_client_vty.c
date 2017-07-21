@@ -31,6 +31,12 @@
 #define PCAP_STRING	"PCAP related functions\n"
 #define SERVER_STRING	"Server string\n"
 
+static const struct value_string osmopcap_protocol_names[] = {
+	{ PROTOCOL_OSMOPCAP,	"osmo-pcap" },
+	{ PROTOCOL_IPIP,	"ipip" },
+	{ 0, NULL }
+};
+
 static struct osmo_pcap_client_conn *get_conn(struct vty *vty)
 {
 	if (vty->node == CLIENT_NODE)
@@ -94,6 +100,10 @@ static void write_client_conn_data(
 	if (conn->source_ip)
 		vty_out(vty, "%s source ip %s%s", indent,
 			conn->source_ip, VTY_NEWLINE);
+
+	if (conn->protocol != PROTOCOL_OSMOPCAP)
+		vty_out(vty, "%s protocol %s%s", indent,
+			get_value_string(osmopcap_protocol_names, conn->protocol), VTY_NEWLINE);
 }
 
 static int config_write_server(struct vty *vty)
@@ -466,6 +476,34 @@ DEFUN(cfg_client_disconnect,
 	return CMD_SUCCESS;
 }
 
+#define PROTOCOL_STR "protocol (osmo-pcap|ipip)"
+#define PROTOCOL_HELP "Configure the Protocol used for transfer\n" \
+			"OsmoPCAP protocol (over TCP)\n" \
+			"IPIP encapsulation (for real-time streaming to wireshark)\n"
+
+DEFUN(cfg_protocol,
+      cfg_protocol_cmd,
+      PROTOCOL_STR,
+      PROTOCOL_HELP)
+{
+	struct osmo_pcap_client_conn *conn = get_conn(vty);
+
+	conn->protocol = get_string_value(osmopcap_protocol_names, argv[0]);
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_client_protocol,
+      cfg_client_protocol_cmd,
+      PROTOCOL_STR,
+      PROTOCOL_HELP)
+{
+	struct osmo_pcap_client_conn *conn = get_conn(vty);
+
+	conn->protocol = get_string_value(osmopcap_protocol_names, argv[0]);
+	return CMD_SUCCESS;
+}
+
+
 int vty_client_init(struct osmo_pcap_client *pcap)
 {
 	install_element(CONFIG_NODE, &cfg_client_cmd);
@@ -482,6 +520,7 @@ int vty_client_init(struct osmo_pcap_client *pcap)
 	install_element(CLIENT_NODE, &cfg_server_ip_cmd);
 	install_element(CLIENT_NODE, &cfg_server_port_cmd);
 	install_element(CLIENT_NODE, &cfg_source_ip_cmd);
+	install_element(CLIENT_NODE, &cfg_protocol_cmd);
 
 	install_element(CLIENT_NODE, &cfg_enable_tls_cmd);
 	install_element(CLIENT_NODE, &cfg_disable_tls_cmd);
@@ -526,6 +565,7 @@ int vty_client_init(struct osmo_pcap_client *pcap)
 	install_element(CLIENT_SERVER_NODE, &cfg_tls_log_level_cmd);
 	install_element(CLIENT_SERVER_NODE, &cfg_client_connect_cmd);
 	install_element(CLIENT_SERVER_NODE, &cfg_client_disconnect_cmd);
+	install_element(CLIENT_SERVER_NODE, &cfg_client_protocol_cmd);
 
 	return 0;
 }

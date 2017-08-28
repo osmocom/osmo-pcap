@@ -4,6 +4,9 @@ SUBDIRS = include src contrib tests
 
 BUILT_SOURCES = $(top_srcdir)/.version
 EXTRA_DIST = git-version-gen .version
+
+@RELMAKE@
+
 $(top_srcdir)/.version:
 	echo $(VERSION) > $@-t && mv $@-t $@
 dist-hook:

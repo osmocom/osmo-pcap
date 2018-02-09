@@ -4,9 +4,9 @@ Priority: extra
 Maintainer: Holger Hans Peter Freyther <zecke@selfish.org>
 Build-Depends: debhelper (>= 7.0.50~), dh-autoreconf, autotools-dev, libpcap0.8-dev, pkg-config, libosmocore-dev, libgnutls28-dev, libzmq3-dev
 Standards-Version: 3.9.1
-Homepage: http://openbsc.osmocom.org
-#Vcs-Git: git://git.debian.org/collab-maint/osmo-pcap.git
-#Vcs-Browser: http://git.debian.org/?p=collab-maint/osmo-pcap.git;a=summary
+Homepage: https://osmocom.org/projects/osmo-pcap
+Vcs-Git: git://git.osmocom.org/osmo-pcap.git
+Vcs-Browser: http://git.osmocom.org/osmo-pcap/
 
 Package: osmo-pcap-client
 Architecture: any

@@ -26,15 +26,10 @@
 #include <inttypes.h>
 #include <pcap.h>
 
-/*
- * Should send an entire pcap header
- */
-#define PKT_LINK_HDR	0
-
-/*
- * Should send one packet...
- */
-#define PKT_LINK_DATA	1
+enum OsmoPcapDataType {
+	PKT_LINK_HDR, /* Should send an entire pcap header */
+	PKT_LINK_DATA /* Should send one packet */
+};
 
 struct osmo_pcap_data {
 	uint8_t type;

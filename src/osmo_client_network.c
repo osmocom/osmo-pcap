@@ -239,7 +239,7 @@ void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
 		return;
 	}
 
-	msg = msgb_alloc(conn->client->snaplen + sizeof(*om_hdr) + sizeof(*hdr), "link-data");
+	msg = msgb_alloc(sizeof(*om_hdr) + sizeof(*hdr), "link-data");
 	if (!msg) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate data.\n");
 		return;

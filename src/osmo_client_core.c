@@ -100,7 +100,7 @@ static int check_gprs(const u_char *data, bpf_u_int32 len)
 	return 1;
 }
 
-static int forward_packet(
+static int can_forward_packet(
 			struct osmo_pcap_client *client,
 			struct pcap_pkthdr *hdr,
 			const u_char *data)
@@ -165,7 +165,7 @@ static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 		return -1;
 	}
 
-	if (!forward_packet(client, &hdr, data))
+	if (!can_forward_packet(client, &hdr, data))
 		return 0;
 
 	osmo_client_send_data(&client->conn, &hdr, data);

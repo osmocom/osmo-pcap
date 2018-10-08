@@ -42,7 +42,6 @@
 #include <string.h>
 #include <unistd.h>
 
-
 static void _osmo_client_connect(void *_data)
 {
 	osmo_client_connect((struct osmo_pcap_client_conn *) _data);
@@ -257,7 +256,7 @@ void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
 	hdr->version_minor = 4;
 	hdr->thiszone = 0;
 	hdr->sigfigs = 0;
-	hdr->snaplen = UINT_MAX;
+	hdr->snaplen = MAXIMUM_SNAPLEN;
 	hdr->linktype = pcap_datalink(conn->client->handle);
 
 	write_data(conn, msg);

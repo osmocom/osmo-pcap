@@ -48,7 +48,7 @@
 static const char *config_file = "osmo-pcap-client.cfg";
 static int daemonize = 0;
 
-void *tall_bsc_ctx;
+void *tall_cli_ctx;
 struct osmo_pcap_client *pcap_client;
 extern void *tall_msgb_ctx;
 extern void *tall_ctr_ctx;
@@ -163,7 +163,7 @@ static void signal_handler(int signal)
 		 * and then return to the caller, who will abort the process */
 	case SIGUSR1:
 		talloc_report(tall_vty_ctx, stderr);
-		talloc_report_full(tall_bsc_ctx, stderr);
+		talloc_report_full(tall_cli_ctx, stderr);
 		break;
 	default:
 		break;
@@ -172,9 +172,9 @@ static void signal_handler(int signal)
 
 static void talloc_init_ctx()
 {
-	tall_bsc_ctx = talloc_named_const(NULL, 0, "nat");
-	tall_msgb_ctx = talloc_named_const(tall_bsc_ctx, 0, "msgb");
-	tall_ctr_ctx = talloc_named_const(tall_bsc_ctx, 0, "counter");
+	tall_cli_ctx = talloc_named_const(NULL, 0, "client");
+	tall_msgb_ctx = talloc_named_const(tall_cli_ctx, 0, "msgb");
+	tall_ctr_ctx = talloc_named_const(tall_cli_ctx, 0, "counter");
 }
 
 int main(int argc, char **argv)
@@ -192,8 +192,8 @@ int main(int argc, char **argv)
 	/* parse options */
 	handle_options(argc, argv);
 
-	rate_ctr_init(tall_bsc_ctx);
-	osmo_stats_init(tall_bsc_ctx);
+	rate_ctr_init(tall_cli_ctx);
+	osmo_stats_init(tall_cli_ctx);
 
 	/* seed the PRNG */
 	srand(time(NULL));
@@ -206,13 +206,13 @@ int main(int argc, char **argv)
 
 	osmo_tls_init();
 
-	rc = telnet_init(tall_bsc_ctx, NULL, OSMO_VTY_PORT_PCAP_CLIENT);
+	rc = telnet_init(tall_cli_ctx, NULL, OSMO_VTY_PORT_PCAP_CLIENT);
 	if (rc < 0) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to bind telnet interface\n");
 		exit(1);
 	}
 
-	pcap_client = talloc_zero(tall_bsc_ctx, struct osmo_pcap_client);
+	pcap_client = talloc_zero(tall_cli_ctx, struct osmo_pcap_client);
 	if (!pcap_client) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate osmo_pcap_client.\n");
 		exit(1);

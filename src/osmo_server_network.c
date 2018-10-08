@@ -192,12 +192,15 @@ static int link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 {
 	struct pcap_file_header *hdr;
 
-	if (data->len != sizeof(*hdr)) {
-		LOGP(DSERVER, LOGL_ERROR, "The pcap_file_header does not fit.\n");
+	hdr = (struct pcap_file_header *) &data->data[0];
+
+	if (hdr->snaplen > SERVER_MAX_DATA_SIZE) {
+		LOGP(DSERVER, LOGL_ERROR,
+		     "The recvd pcap_file_header contains too big snaplen %zu > %zu\n",
+		     (size_t) hdr->snaplen, (size_t) SERVER_MAX_DATA_SIZE);
 		return -1;
 	}
 
-	hdr = (struct pcap_file_header *) &data->data[0];
 	if (!conn->no_store && conn->local_fd < 0) {
 		conn->file_hdr = *hdr;
 		restart_pcap(conn);
@@ -335,6 +338,36 @@ static int do_read(struct osmo_pcap_conn *conn, void *buf, size_t size)
 	return do_read_tls(conn, buf, size);
 }
 
+static bool pcap_data_valid(struct osmo_pcap_conn *conn)
+{
+	unsigned int min_len, max_len;
+	switch ((enum OsmoPcapDataType) conn->data->type) {
+	case PKT_LINK_HDR:
+		if (conn->data->len != sizeof(struct pcap_file_header)) {
+			LOGP(DSERVER, LOGL_ERROR,
+			     "Implausible llink_hdr length: %u != %zu\n",
+			     conn->data->len, sizeof(struct osmo_pcap_pkthdr));
+			return false;
+		}
+		break;
+	case PKT_LINK_DATA:
+		min_len = sizeof(struct osmo_pcap_pkthdr);
+		max_len = SERVER_MAX_DATA_SIZE + sizeof(struct osmo_pcap_pkthdr);
+		if (conn->data->len < min_len || conn->data->len > max_len) {
+			LOGP(DSERVER, LOGL_ERROR,
+			     "Implausible data length: %u < %u <= %u\n",
+			     min_len, conn->data->len, max_len);
+			return false;
+		}
+		break;
+	default:
+		LOGP(DSERVER, LOGL_ERROR, "Unknown data type %" PRIx8 "\n",
+		     conn->data->type);
+		return false;
+	}
+	return true;
+}
+
 static int read_cb_initial(struct osmo_pcap_conn *conn)
 {
 	int rc;
@@ -354,11 +387,8 @@ static int read_cb_initial(struct osmo_pcap_conn *conn)
 	} else if (conn->pend == 0) {
 		conn->data->len = ntohs(conn->data->len);
 
-		if (conn->data->len > SERVER_MAX_DATA_SIZE) {
-			LOGP(DSERVER, LOGL_ERROR,
-			     "Implausible data length: %u\n", conn->data->len);
+		if (!pcap_data_valid(conn))
 			return -1;
-		}
 
 		conn->state = STATE_DATA;
 		conn->pend = conn->data->len;

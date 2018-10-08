@@ -91,7 +91,7 @@ struct osmo_pcap_conn {
 	int state;
 	int pend;
 	int reopen;
-	char buf[SERVER_MAX_DATA_SIZE + sizeof(struct osmo_pcap_data)];
+	char buf[sizeof(struct osmo_pcap_data) + sizeof(struct osmo_pcap_pkthdr) + SERVER_MAX_DATA_SIZE];
 	struct osmo_pcap_data *data;
 
 	/* statistics */

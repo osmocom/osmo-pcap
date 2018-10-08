@@ -22,6 +22,18 @@ AC_PROG_RANLIB
 dnl checks for header files
 AC_HEADER_STDC
 
+AC_ARG_ENABLE(sanitize,
+	[AS_HELP_STRING(
+		[--enable-sanitize],
+		[Compile with address sanitizer enabled],
+	)],
+	[sanitize=$enableval], [sanitize="no"])
+if test x"$sanitize" = x"yes"
+then
+	CFLAGS="$CFLAGS -fsanitize=address -fsanitize=undefined"
+	CPPFLAGS="$CPPFLAGS -fsanitize=address -fsanitize=undefined"
+fi
+
 AC_ARG_ENABLE(werror,
 	[AS_HELP_STRING(
 		[--enable-werror],

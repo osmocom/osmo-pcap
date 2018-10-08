@@ -285,7 +285,7 @@ struct osmo_pcap_conn *osmo_pcap_server_find(struct osmo_pcap_server *server,
 		return NULL;
 	}
 	memcpy(desc, &pcap_peer_group_desc, sizeof(pcap_peer_group_desc));
-	desc->group_name_prefix = talloc_asprintf(desc, "pcap.peer.%s", name);
+	desc->group_name_prefix = talloc_asprintf(desc, "pcap:peer:%s", name);
 	if (!desc->group_name_prefix) {
 		LOGP(DSERVER, LOGL_ERROR,
 			"Failed to allocate group name prefix peer=%s\n", name);

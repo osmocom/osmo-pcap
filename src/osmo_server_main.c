@@ -56,18 +56,18 @@ extern void *tall_ctr_ctx;
 
 
 static const struct rate_ctr_desc pcap_peer_ctr_desc[] = {
-	[PEER_CTR_CONNECT]		= { "peer.connect",	"Connect of a peer   " },
-	[PEER_CTR_BYTES]		= { "peer.bytes",	"Received bytes      " },
-	[PEER_CTR_PKTS]			= { "peer.pkts",	"Received packets    " },
-	[PEER_CTR_PROTATE]		= { "peer.file_rotated","Capture file rotated" },
+	[PEER_CTR_CONNECT]		= { "peer:connect",	"Connect of a peer   " },
+	[PEER_CTR_BYTES]		= { "peer:bytes",	"Received bytes      " },
+	[PEER_CTR_PKTS]			= { "peer:pkts",	"Received packets    " },
+	[PEER_CTR_PROTATE]		= { "peer:file_rotated","Capture file rotated" },
 };
 
 static const struct rate_ctr_desc pcap_server_ctr_desc[] = {
-	[SERVER_CTR_CONNECT]		= { "server.connect",	"Connect of a peer   " },
-	[SERVER_CTR_BYTES]		= { "server.bytes",	"Received bytes      " },
-	[SERVER_CTR_PKTS]		= { "server.pkts",	"Received packets    " },
-	[SERVER_CTR_PROTATE]		= { "server.file_rotated", "Capture file rotated" },
-	[SERVER_CTR_NOCLIENT]		= { "server.no_client", "Unknown connected   " },
+	[SERVER_CTR_CONNECT]		= { "server:connect",	"Connect of a peer   " },
+	[SERVER_CTR_BYTES]		= { "server:bytes",	"Received bytes      " },
+	[SERVER_CTR_PKTS]		= { "server:pkts",	"Received packets    " },
+	[SERVER_CTR_PROTATE]		= { "server:file_rotated", "Capture file rotated" },
+	[SERVER_CTR_NOCLIENT]		= { "server:no_client", "Unknown connected   " },
 };
 
 const struct rate_ctr_group_desc pcap_peer_group_desc = {
@@ -79,7 +79,7 @@ const struct rate_ctr_group_desc pcap_peer_group_desc = {
 };
 
 static const struct rate_ctr_group_desc pcap_server_group_desc = {
-	.group_name_prefix		= "pcap.server",
+	.group_name_prefix		= "pcap:server",
 	.group_description		= "PCAP Server global statistics",
 	.num_ctr			= ARRAY_SIZE(pcap_server_ctr_desc),
 	.ctr_desc			= pcap_server_ctr_desc,

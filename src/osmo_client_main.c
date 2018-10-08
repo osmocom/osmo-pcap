@@ -55,21 +55,21 @@ extern void *tall_ctr_ctx;
 
 
 static const struct rate_ctr_desc pcap_client_ctr_desc[] = {
-	[CLIENT_CTR_CONNECT]		= { "server.connect",		"Connects to the server" },
-	[CLIENT_CTR_BYTES]		= { "captured.bytes",		"Captured bytes        " },
-	[CLIENT_CTR_PKTS]		= { "captured.pkts",		"Captured packets      " },
-	[CLIENT_CTR_2BIG]		= { "bpf.too_big",		"Captured data too big " },
-	[CLIENT_CTR_NOMEM]		= { "client.no_mem",		"No memory available   " },
-	[CLIENT_CTR_QERR]		= { "client.queue_err",		"Can not queue data    " },
-	[CLIENT_CTR_PERR]		= { "client.pcap_err",		"libpcap error         " },
-	[CLIENT_CTR_WERR]		= { "client.write_err",		"Write error           " },
-	[CLIENT_CTR_P_RECV]		= { "pcap.recv",		"PCAP received packets " },
-	[CLIENT_CTR_P_DROP]		= { "pcap.drop",		"PCAP dropped packets  " },
-	[CLIENT_CTR_P_IFDROP]		= { "pcap.ifdrop",		"iface dropped packets " },
+	[CLIENT_CTR_CONNECT]		= { "server:connect",		"Connects to the server" },
+	[CLIENT_CTR_BYTES]		= { "captured:bytes",		"Captured bytes        " },
+	[CLIENT_CTR_PKTS]		= { "captured:pkts",		"Captured packets      " },
+	[CLIENT_CTR_2BIG]		= { "bpf:too_big",		"Captured data too big " },
+	[CLIENT_CTR_NOMEM]		= { "client:no_mem",		"No memory available   " },
+	[CLIENT_CTR_QERR]		= { "client:queue_err",		"Can not queue data    " },
+	[CLIENT_CTR_PERR]		= { "client:pcap_err",		"libpcap error         " },
+	[CLIENT_CTR_WERR]		= { "client:write_err",		"Write error           " },
+	[CLIENT_CTR_P_RECV]		= { "pcap:recv",		"PCAP received packets " },
+	[CLIENT_CTR_P_DROP]		= { "pcap:drop",		"PCAP dropped packets  " },
+	[CLIENT_CTR_P_IFDROP]		= { "pcap:ifdrop",		"iface dropped packets " },
 };
 
 static const struct rate_ctr_group_desc pcap_client_ctr_group_desc = {
-	.group_name_prefix		= "pcap.client",
+	.group_name_prefix		= "pcap:client",
 	.group_description		= "PCAP Client statistics",
 	.num_ctr			= ARRAY_SIZE(pcap_client_ctr_desc),
 	.ctr_desc			= pcap_client_ctr_desc,

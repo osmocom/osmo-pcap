@@ -172,7 +172,7 @@ void osmo_client_send_data(struct osmo_pcap_client_conn *conn,
 
 	if (in_hdr->caplen > 9000) {
 		LOGP(DCLIENT, LOGL_ERROR,
-			"Capture len too big %zu\n", in_hdr->caplen);
+			"Capture len too big %zu\n", (size_t) in_hdr->caplen);
 		rate_ctr_inc(&conn->client->ctrg->ctr[CLIENT_CTR_2BIG]);
 		return;
 	}

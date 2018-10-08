@@ -125,7 +125,9 @@ static int config_write_client(struct vty *vty)
 	if (pcap_client->device)
 		vty_out(vty, " pcap device %s%s",
 			pcap_client->device, VTY_NEWLINE);
-
+	if (pcap_client->snaplen != DEFAULT_SNAPLEN)
+		vty_out(vty, " pcap snaplen %d%s",
+			pcap_client->snaplen, VTY_NEWLINE);
 	if (pcap_client->filter_string)
 		vty_out(vty, " pcap filter %s%s",
 			pcap_client->filter_string, VTY_NEWLINE);
@@ -145,6 +147,19 @@ DEFUN(cfg_client_device,
       PCAP_STRING "the device to filter\n" "device name\n")
 {
 	osmo_client_capture(pcap_client, argv[0]);
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_client_snaplen,
+      cfg_client_snaplen_cmd,
+	      "pcap snaplen <1-262144>", /* MAXIMUM_SNAPLEN */
+      PCAP_STRING "snapshot length\n" "Bytes\n")
+{
+	if (pcap_client->handle) {
+		vty_out(vty, "'pcap snaplen' must be set before 'pcap device' to take effect!%s", VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	pcap_client->snaplen = atoi(argv[0]);
 	return CMD_SUCCESS;
 }
 
@@ -512,6 +527,7 @@ int vty_client_init(struct osmo_pcap_client *pcap)
 	install_node(&server_node, config_write_server);
 
 	install_element(CLIENT_NODE, &cfg_client_device_cmd);
+	install_element(CLIENT_NODE, &cfg_client_snaplen_cmd);
 	install_element(CLIENT_NODE, &cfg_client_filter_cmd);
 	install_element(CLIENT_NODE, &cfg_client_loop_cmd);
 

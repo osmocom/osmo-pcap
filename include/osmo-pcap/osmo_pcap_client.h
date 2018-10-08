@@ -94,6 +94,7 @@ struct osmo_pcap_client {
 	char   *filter_string;
 	int filter_itself;
 	int gprs_filtering;
+	int snaplen;
 	struct osmo_fd fd;
 
 	struct osmo_pcap_client_conn conn;
@@ -105,6 +106,7 @@ struct osmo_pcap_client {
 
 extern struct osmo_pcap_client *pcap_client;
 
+struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx);
 int vty_client_init(struct osmo_pcap_client *);
 
 int osmo_client_capture(struct osmo_pcap_client *client, const char *device);

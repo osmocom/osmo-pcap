@@ -63,4 +63,6 @@ extern int osmopcap_is_config_node(struct vty *vty, int node);
 #define MAXIMUM_SNAPLEN	262144
 #endif
 
+#define DEFAULT_SNAPLEN 9000
+
 #endif

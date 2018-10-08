@@ -169,14 +169,14 @@ void osmo_client_send_data(struct osmo_pcap_client_conn *conn,
 	struct msgb *msg;
 	int offset, ip_len;
 
-	if (in_hdr->caplen > 9000) {
+	if (in_hdr->len > in_hdr->caplen) {
 		LOGP(DCLIENT, LOGL_ERROR,
-			"Capture len too big %zu\n", (size_t) in_hdr->caplen);
+			"Recording truncated packet, len %zu > snaplen %zu\n",
+			(size_t) in_hdr->len, (size_t) in_hdr->caplen);
 		rate_ctr_inc(&conn->client->ctrg->ctr[CLIENT_CTR_2BIG]);
-		return;
 	}
 
-	msg = msgb_alloc(9000 + sizeof(*om_hdr) + sizeof(*hdr), "data-data");
+	msg = msgb_alloc(in_hdr->caplen + sizeof(*om_hdr) + sizeof(*hdr), "data-data");
 	if (!msg) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate.\n");
 		rate_ctr_inc(&conn->client->ctrg->ctr[CLIENT_CTR_NOMEM]);
@@ -239,7 +239,7 @@ void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
 		return;
 	}
 
-	msg = msgb_alloc(9000 + sizeof(*om_hdr) + sizeof(*hdr), "link-data");
+	msg = msgb_alloc(conn->client->snaplen + sizeof(*om_hdr) + sizeof(*hdr), "link-data");
 	if (!msg) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate data.\n");
 		return;
@@ -256,7 +256,7 @@ void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
 	hdr->version_minor = 4;
 	hdr->thiszone = 0;
 	hdr->sigfigs = 0;
-	hdr->snaplen = MAXIMUM_SNAPLEN;
+	hdr->snaplen = conn->client->snaplen;
 	hdr->linktype = pcap_datalink(conn->client->handle);
 
 	write_data(conn, msg);

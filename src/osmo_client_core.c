@@ -287,7 +287,9 @@ int osmo_client_capture(struct osmo_pcap_client *client, const char *device)
 		return 1;
 	}
 
-	client->handle = pcap_open_live(client->device, 9000, 0,
+	LOGP(DCLIENT, LOGL_INFO, "Opening device %s for capture with snaplen %zu\n",
+	     client->device, (size_t) client->snaplen);
+	client->handle = pcap_open_live(client->device, client->snaplen, 0,
 					1000, client->errbuf);
 	if (!client->handle) {
 		LOGP(DCLIENT, LOGL_ERROR,
@@ -346,6 +348,16 @@ void osmo_client_conn_init(struct osmo_pcap_client_conn *conn,
 	conn->wqueue.bfd.fd = -1;
 }
 
+struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx)
+{
+	struct osmo_pcap_client *client;
+	client = talloc_zero(tall_ctx, struct osmo_pcap_client);
+	if (!client)
+		return NULL;
+	client->fd.fd = -1;
+	client->snaplen = DEFAULT_SNAPLEN;
+	return client;
+}
 
 void osmo_client_free(struct osmo_pcap_client_conn *conn)
 {

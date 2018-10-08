@@ -212,12 +212,11 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	pcap_client = talloc_zero(tall_cli_ctx, struct osmo_pcap_client);
+	pcap_client = osmo_pcap_client_alloc(tall_cli_ctx);
 	if (!pcap_client) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate osmo_pcap_client.\n");
 		exit(1);
 	}
-	pcap_client->fd.fd = -1;
 	vty_client_init(pcap_client);
 
 	/* initialize the queue */

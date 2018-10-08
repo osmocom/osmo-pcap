@@ -506,7 +506,6 @@ void vty_server_init(struct osmo_pcap_server *server)
 {
 	install_element(CONFIG_NODE, &cfg_server_cmd);
 	install_node(&server_node, config_write_server);
-	install_default(SERVER_NODE);
 
 	install_element(SERVER_NODE, &cfg_server_base_cmd);
 	install_element(SERVER_NODE, &cfg_server_ip_cmd);

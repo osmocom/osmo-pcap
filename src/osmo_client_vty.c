@@ -508,10 +508,8 @@ int vty_client_init(struct osmo_pcap_client *pcap)
 {
 	install_element(CONFIG_NODE, &cfg_client_cmd);
 	install_node(&client_node, config_write_client);
-	install_default(CLIENT_NODE);
 
 	install_node(&server_node, config_write_server);
-	install_default(CLIENT_SERVER_NODE);
 
 	install_element(CLIENT_NODE, &cfg_client_device_cmd);
 	install_element(CLIENT_NODE, &cfg_client_filter_cmd);

@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 	int rc;
 
 	talloc_init_ctx();
-	osmo_init_logging(&log_info);
+	osmo_init_logging2(tall_srv_ctx, &log_info);
 
 	vty_info.copyright = osmopcap_copyright;
 	vty_init(&vty_info);

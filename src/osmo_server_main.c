@@ -49,7 +49,7 @@
 static const char *config_file = "osmo-pcap-server.cfg";
 static int daemonize = 0;
 
-void *tall_bsc_ctx;
+void *tall_srv_ctx;
 struct osmo_pcap_server *pcap_server;
 extern void *tall_msgb_ctx;
 extern void *tall_ctr_ctx;
@@ -173,7 +173,7 @@ static void signal_handler(int signal)
 		 * and then return to the caller, who will abort the process */
 	case SIGUSR1:
 		talloc_report(tall_vty_ctx, stderr);
-		talloc_report_full(tall_bsc_ctx, stderr);
+		talloc_report_full(tall_srv_ctx, stderr);
 		break;
 	case SIGHUP:
 		osmo_pcap_server_reopen(pcap_server);
@@ -185,9 +185,9 @@ static void signal_handler(int signal)
 
 static void talloc_init_ctx()
 {
-	tall_bsc_ctx = talloc_named_const(NULL, 0, "server");
-	tall_msgb_ctx = talloc_named_const(tall_bsc_ctx, 0, "msgb");
-	tall_ctr_ctx = talloc_named_const(tall_bsc_ctx, 0, "counter");
+	tall_srv_ctx = talloc_named_const(NULL, 0, "server");
+	tall_msgb_ctx = talloc_named_const(tall_srv_ctx, 0, "msgb");
+	tall_ctr_ctx = talloc_named_const(tall_srv_ctx, 0, "counter");
 }
 
 int main(int argc, char **argv)
@@ -205,8 +205,8 @@ int main(int argc, char **argv)
 	/* parse options */
 	handle_options(argc, argv);
 
-	rate_ctr_init(tall_bsc_ctx);
-	osmo_stats_init(tall_bsc_ctx);
+	rate_ctr_init(tall_srv_ctx);
+	osmo_stats_init(tall_srv_ctx);
 
 	/* seed the PRNG */
 	srand(time(NULL));
@@ -219,13 +219,13 @@ int main(int argc, char **argv)
 
 	osmo_tls_init();
 
-	rc = telnet_init(tall_bsc_ctx, NULL, OSMO_VTY_PORT_PCAP_SERVER);
+	rc = telnet_init(tall_srv_ctx, NULL, OSMO_VTY_PORT_PCAP_SERVER);
 	if (rc < 0) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to bind telnet interface\n");
 		exit(1);
 	}
 
-	pcap_server = talloc_zero(tall_bsc_ctx, struct osmo_pcap_server);
+	pcap_server = talloc_zero(tall_srv_ctx, struct osmo_pcap_server);
 	if (!pcap_server) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to allocate osmo_pcap_server.\n");
 		exit(1);

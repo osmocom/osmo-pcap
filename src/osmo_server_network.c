@@ -194,10 +194,10 @@ static int link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 
 	hdr = (struct pcap_file_header *) &data->data[0];
 
-	if (hdr->snaplen > SERVER_MAX_DATA_SIZE) {
+	if (hdr->snaplen > conn->server->max_snaplen) {
 		LOGP(DSERVER, LOGL_ERROR,
 		     "The recvd pcap_file_header contains too big snaplen %zu > %zu\n",
-		     (size_t) hdr->snaplen, (size_t) SERVER_MAX_DATA_SIZE);
+		     (size_t) hdr->snaplen, (size_t) conn->server->max_snaplen);
 		return -1;
 	}
 
@@ -266,6 +266,7 @@ struct osmo_pcap_conn *osmo_pcap_server_find(struct osmo_pcap_server *server,
 {
 	struct rate_ctr_group_desc *desc;
 	struct osmo_pcap_conn *conn;
+	size_t buf_size;
 
 	llist_for_each_entry(conn, &server->conn, entry) {
 		if (strcmp(conn->name, name) == 0)
@@ -279,6 +280,10 @@ struct osmo_pcap_conn *osmo_pcap_server_find(struct osmo_pcap_server *server,
 		return NULL;
 	}
 
+	buf_size = sizeof(struct osmo_pcap_data);
+	buf_size += OSMO_MAX(sizeof(struct pcap_file_header),
+			     sizeof(struct osmo_pcap_pkthdr) + server->max_snaplen);
+	conn->data = talloc_zero_size(conn, buf_size);
 	/* a bit nasty. we do not work with ids but names */
 	desc = talloc_zero(conn, struct rate_ctr_group_desc);
 	if (!desc) {
@@ -318,7 +323,6 @@ struct osmo_pcap_conn *osmo_pcap_server_find(struct osmo_pcap_server *server,
 	conn->rem_wq.bfd.fd = -1;
 	conn->local_fd = -1;
 	conn->server = server;
-	conn->data = (struct osmo_pcap_data *) &conn->buf[0];
 	llist_add_tail(&conn->entry, &server->conn);
 	return conn;
 }
@@ -352,7 +356,7 @@ static bool pcap_data_valid(struct osmo_pcap_conn *conn)
 		break;
 	case PKT_LINK_DATA:
 		min_len = sizeof(struct osmo_pcap_pkthdr);
-		max_len = SERVER_MAX_DATA_SIZE + sizeof(struct osmo_pcap_pkthdr);
+		max_len = conn->server->max_snaplen + sizeof(struct osmo_pcap_pkthdr);
 		if (conn->data->len < min_len || conn->data->len > max_len) {
 			LOGP(DSERVER, LOGL_ERROR,
 			     "Implausible data length: %u < %u <= %u\n",
@@ -372,7 +376,7 @@ static int read_cb_initial(struct osmo_pcap_conn *conn)
 {
 	int rc;
 
-	rc = do_read(conn, &conn->buf[sizeof(*conn->data) - conn->pend], conn->pend);
+	rc = do_read(conn, ((uint8_t*)conn->data) + sizeof(*conn->data) - conn->pend, conn->pend);
 	if (rc <= 0) {
 		LOGP(DSERVER, LOGL_ERROR,
 		     "Too short packet. Got %d, wanted %d\n", rc, conn->data->len);

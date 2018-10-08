@@ -239,6 +239,7 @@ int main(int argc, char **argv)
 	INIT_LLIST_HEAD(&pcap_server->conn);
 	pcap_server->base_path = talloc_strdup(pcap_server, "./");
 	pcap_server->max_size = 1073741824;
+	pcap_server->max_snaplen = DEFAULT_SNAPLEN;
 	vty_server_init(pcap_server);
 
 	if (vty_read_config_file(config_file, NULL) < 0) {

@@ -48,8 +48,6 @@ struct osmo_pcap_server;
 #define STATE_INITIAL	0
 #define STATE_DATA	1
 
-#define SERVER_MAX_DATA_SIZE 10000
-
 enum {
 	PEER_CTR_CONNECT,
 	PEER_CTR_BYTES,
@@ -91,7 +89,6 @@ struct osmo_pcap_conn {
 	int state;
 	int pend;
 	int reopen;
-	char buf[sizeof(struct osmo_pcap_data) + sizeof(struct osmo_pcap_pkthdr) + SERVER_MAX_DATA_SIZE];
 	struct osmo_pcap_data *data;
 
 	/* statistics */
@@ -133,6 +130,7 @@ struct osmo_pcap_server {
 
 	char *base_path;
 	off_t max_size;
+	int max_snaplen;
 
 	/* statistics */
 	struct rate_ctr_group *ctrg;

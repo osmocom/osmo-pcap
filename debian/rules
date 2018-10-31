@@ -16,6 +16,7 @@ PCAP_LIBS="-lpcap"
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
+		--with-systemdsystemunitdir=/lib/systemd/system \
 		--with-pcap-config=/bin/false \
 		PCAP_CFLAGS=$(PCAP_CFLAGS) \
 		PCAP_LIBS=$(PCAP_LIBS)

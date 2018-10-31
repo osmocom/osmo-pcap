@@ -1,0 +1,12 @@
+[Unit]
+Description=PCAP Server for the PCAP aggregation
+
+[Service]
+Type=simple
+Restart=always
+ExecStart=/usr/bin/osmo-pcap-server -c /etc/osmocom/osmo-pcap-server.cfg
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+

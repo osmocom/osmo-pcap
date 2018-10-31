@@ -1,1 +1,2 @@
+lib/systemd/system/osmo-pcap-server.service
 usr/bin/osmo-pcap-server

@@ -21,17 +21,6 @@ override_dh_auto_configure:
 		PCAP_CFLAGS=$(PCAP_CFLAGS) \
 		PCAP_LIBS=$(PCAP_LIBS)
 
-override_dh_auto_install:
-	dh_auto_install $@
-	install -d -m 0755 $(CURDIR)/debian/osmo-pcap-client/etc/osmo-pcap/
-	install -m 0644 $(CURDIR)/contrib/osmo-pcap-client.cfg $(CURDIR)/debian/osmo-pcap-client/etc/osmo-pcap
-
-	install -d -m 0755 $(CURDIR)/debian/osmo-pcap-server/etc/osmo-pcap/
-	install -m 0644 $(CURDIR)/contrib/osmo-pcap-server.cfg $(CURDIR)/debian/osmo-pcap-server/etc/osmo-pcap
-
-	install -d -m 0755 $(CURDIR)/debian/osmo-pcap-server/etc/cron.daily/
-	install -m 0755 $(CURDIR)/contrib/osmo_pcap_clean_old $(CURDIR)/debian/osmo-pcap-server/etc/cron.daily/
-
 override_dh_strip:
 	dh_strip -posmo-pcap-client --dbg-package=osmo-pcap-client-dbg
 	dh_strip -posmo-pcap-server --dbg-package=osmo-pcap-server-dbg

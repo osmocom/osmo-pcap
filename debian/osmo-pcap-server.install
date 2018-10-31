@@ -1,2 +1,5 @@
+etc/osmocom/osmo-pcap-server.cfg
 lib/systemd/system/osmo-pcap-server.service
 usr/bin/osmo-pcap-server
+usr/share/doc/osmo-pcap/examples/osmo-pcap-server/osmo-pcap-server.cfg
+usr/share/doc/osmo-pcap/examples/osmo-pcap-server/osmo-pcap-server-tls.cfg

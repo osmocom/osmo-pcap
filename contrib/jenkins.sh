@@ -1,19 +1,45 @@
 #!/usr/bin/env bash
+# jenkins build helper script for osmo-pcap.  This is how we build on jenkins.osmocom.org
+
+if ! [ -x "$(command -v osmo-build-dep.sh)" ]; then
+	echo "Error: We need to have scripts/osmo-deps.sh from http://git.osmocom.org/osmo-ci/ in PATH !"
+	exit 2
+fi
 
 set -ex
 
-rm -rf deps/install
-mkdir deps || true
-cd deps
-osmo-deps.sh libosmocore
 
-cd libosmocore
-autoreconf --install --force
-./configure --prefix=$PWD/../install
-$MAKE $PARALLEL_MAKE install
+base="$PWD"
+deps="$base/deps"
+inst="$deps/install"
+export deps inst
 
-cd ../../
+osmo-clean-workspace.sh
+
+mkdir "$deps" || true
+
+verify_value_string_arrays_are_terminated.py $(find . -name "*.[hc]")
+
+export PKG_CONFIG_PATH="$inst/lib/pkgconfig:$PKG_CONFIG_PATH"
+export LD_LIBRARY_PATH="$inst/lib"
+osmo-build-dep.sh libosmocore "" '--disable-doxygen --enable-gnutls'
+
+set +x
+echo
+echo
+echo
+echo " =============================== osmo-pcap ==============================="
+echo
+set -x
+
+
+cd "$base"
 autoreconf --install --force
-PCAP_LIBS="-lpcap" PCAP_CFLAGS="" PKG_CONFIG_PATH=$PWD/deps/install/lib/pkgconfig ./configure --with-pcap-config=/bin/true --enable-sanitize --enable-werror
-PKG_CONFIG_PATH=$PWD/deps/install/lib/pkgconfig $MAKE $PARALLEL_MAKE
-DISTCHECK_CONFIGURE_FLAGS="--with-pcap-config=/bin/true" PCAP_LIBS="-lpcap" PCAP_CFLAGS="" PKG_CONFIG_PATH=$PWD/deps/install/lib/pkgconfig LD_LIBRARY_PATH=$PWD/deps/install/lib $MAKE distcheck
+PCAP_LIBS="-lpcap" PCAP_CFLAGS="" ./configure --with-pcap-config=/bin/true --enable-sanitize --enable-werror
+$MAKE $PARALLEL_MAKE
+$MAKE check || cat-testlogs.sh
+DISTCHECK_CONFIGURE_FLAGS="--with-pcap-config=/bin/true" \
+        PCAP_LIBS="-lpcap" PCAP_CFLAGS="" \
+        $MAKE distcheck || cat-testlogs.sh
+
+osmo-clean-workspace.sh

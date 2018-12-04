@@ -5,7 +5,7 @@ SUBDIRS = include src contrib doc tests
 BUILT_SOURCES = $(top_srcdir)/.version
 EXTRA_DIST = git-version-gen .version
 
-DISTCHECK_CONFIGURE_FLAGS = \
+AM_DISTCHECK_CONFIGURE_FLAGS = \
 	--with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdir)
 
 

@@ -34,8 +34,8 @@ need to be tuned in the script itself.
 
 ## Installation and Configuration
 
-There are Debian, Ubuntu, SLES, OpenSUSE and CentOS packages available via the excellent
-[openSUSE Build Service](https://build.opensuse.org/project/show/home:zecke23:osmo-pcap).
+There are Debian, Ubuntu, Raspbian packages available via the excellent
+[openSUSE Build Service](https://build.opensuse.org/package/show/network:osmocom:nightly/osmo-pcap).
 
 Please see the *contrib/osmo-pcap-server.cfg* and *contrib/osmo-pcap-client.cfg*
 file in the repository

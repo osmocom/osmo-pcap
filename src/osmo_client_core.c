@@ -20,7 +20,7 @@
  *
  */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #include <osmo-pcap/osmo_pcap_client.h>
 #include <osmo-pcap/common.h>
 

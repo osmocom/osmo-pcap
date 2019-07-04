@@ -27,8 +27,8 @@ osmopcapconfig.h*
 
 
 # apps
-src/osmo_pcap_client
-src/osmo_pcap_server
+src/osmo-pcap-client
+src/osmo-pcap-server
 
 # tests
 tests/atconfig

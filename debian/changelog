@@ -1,4 +1,4 @@
-osmo-pcap (0.0.11) UNRELEASED; urgency=medium
+osmo-pcap (0.0.11) unstable; urgency=medium
 
   * Add "source ip A.B.C.D" option to use specific address.
   * Add osmo-pcap-client-dbg/osmo-pcap-server-dbg package

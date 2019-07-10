@@ -41,5 +41,6 @@ $MAKE check || cat-testlogs.sh
 DISTCHECK_CONFIGURE_FLAGS="--with-pcap-config=/bin/true" \
         PCAP_LIBS="-lpcap" PCAP_CFLAGS="" \
         $MAKE distcheck || cat-testlogs.sh
+$MAKE maintainer-clean
 
 osmo-clean-workspace.sh

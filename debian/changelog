@@ -1,3 +1,54 @@
+osmo-pcap (0.1.0) unstable; urgency=medium
+
+  [ Harald Welte ]
+  * sock_src_init(): Don't freeaddrinfo() undefined src_result
+  * Use TCP port numbers for VTY that don't overlap with other Osmocom Software
+  * Rename osmo_pcap_{client_server} executables to osmo-pcap-{client,server}
+  * Use libosmocore osmo_sock_init2() instead of local implementation
+  * client: Move to osmo_sock_init2_ofd()
+  * Add support for generating IPIP to osmo-pcap-client
+  * debian/control: Fix URLs for homepage, git, gitweb
+  * change binary builds URL to network:osmocom as that's more maintained
+  * Fix compiler warning about deprecated _BSD_SOURCE
+
+  [ Max ]
+  * Add gitreview config
+  * Use release helper from libosmocore
+
+  [ Pau Espin Pedrol ]
+  * cosmetic: client: rename forward_packet function
+  * vty: skip installing cmds now always installed by default
+  * client: Properly name main talloc ctx
+  * server: Properly name main talloc ctx
+  * Drop osmo_init_logging and use osmo_init_logging2
+  * osmo_client_send_data: Fix wrong log format
+  * configure.ac: Add --enable-werror flag
+  * configure.ac: Add --enable-sanitize flag
+  * jenkins.sh: enable werror and sanitize configure flags
+  * Replace '.' in counter names with ':'
+  * Use enum for PKT_LINK_*
+  * client: Set snaplen to MAXIMUM_SNAPLEN
+  * client: Add pcap snaplen VTY cmd
+  * client_send_link: snaplen not needed during allocation
+  * server: Improve verification of messages from client
+  * server: Add pcap snaplen VTY cmd
+  * contrib/jenkins.sh: Update to current osmocom infra
+  * debian: Clean up to look like other osmocom projects
+  * Install systemd services with autotools
+  * Install cfg files with autotools
+  * gitignore: Add compile
+  * debian: Install osmo_pcap_clean_old in osmo-pcap-server pkg
+  * tests/Makefile.am: Fix "./configure && make clean && make"
+  * debian/changelog: Mark 0.0.11 as released
+
+  [ Oliver Smith ]
+  * Fix DISTCHECK_CONFIGURE_FLAGS override
+  * contrib: fix makedistcheck with disabled systemd
+  * gitignore: fix application names
+  * contrib/jenkins.sh: run "make maintainer-clean"
+
+ -- Pau Espin Pedrol <pespin@sysmocom.de>  Tue, 16 Jul 2019 19:01:15 +0200
+
 osmo-pcap (0.0.11) unstable; urgency=medium
 
   * Add "source ip A.B.C.D" option to use specific address.

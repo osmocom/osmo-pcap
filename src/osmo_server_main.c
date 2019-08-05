@@ -199,8 +199,8 @@ int main(int argc, char **argv)
 
 	vty_info.copyright = osmopcap_copyright;
 	vty_init(&vty_info);
-	logging_vty_add_cmds(&log_info);
-	osmo_stats_vty_add_cmds(&log_info);
+	logging_vty_add_cmds();
+	osmo_stats_vty_add_cmds();
 
 	/* parse options */
 	handle_options(argc, argv);

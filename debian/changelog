@@ -1,3 +1,10 @@
+osmo-pcap (0.1.1) unstable; urgency=medium
+
+  * Remove undefined param passed to {logging,osmo_stats}_vty_add_cmds
+  * Require libosmocore 0.11.0
+
+ -- Pau Espin Pedrol <pespin@sysmocom.de>  Wed, 07 Aug 2019 13:12:47 +0200
+
 osmo-pcap (0.1.0) unstable; urgency=medium
 
   [ Harald Welte ]

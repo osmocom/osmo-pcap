@@ -40,6 +40,15 @@ There are Debian, Ubuntu, Raspbian packages available via the excellent
 Please see the *contrib/osmo-pcap-server.cfg* and *contrib/osmo-pcap-client.cfg*
 file in the repository
 
+## Running tests
+
+In order to run all tests, do the following:
+
+$ ./configure --enable-external-tests
+$ make -j5
+$ sudo setcap 'CAP_NET_RAW+eip CAP_NET_ADMIN+eip' src/osmo-pcap-client
+$ make check
+
 ## Wishlist/TODO
 
 - [ ] Add non-blocking TLS (probably GNUtls) support between client and server.

@@ -15,8 +15,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 app_configs = {
-    "osmo-pcap-client": ["contrib/osmo-pcap-client.cfg", "contrib/osmo-pcap-client-tls.cfg"],
-    "osmo-pcap-server": ["contrib/osmo-pcap-server.cfg", "contrib/osmo-pcap-server-tls.cfg"]
+    "osmo-pcap-client": ["doc/examples/osmo-pcap-client/osmo-pcap-client.cfg",
+                         "doc/examples/osmo-pcap-client/osmo-pcap-client-tls.cfg"],
+    "osmo-pcap-server": ["doc/examples/osmo-pcap-server/osmo-pcap-server.cfg",
+                         "doc/examples/osmo-pcap-server/osmo-pcap-server-tls.cfg"]
 }
 
 apps = [
@@ -24,7 +26,7 @@ apps = [
     (4237, "src/osmo-pcap-client", "OsmoPCAPClient", "osmo-pcap-client"),
         ]
 
-vty_command = ["src/osmo-pcap-server", "-c", "contrib/osmo-pcap-server.cfg"]
+vty_command = ["src/osmo-pcap-server", "-c", "doc/examples/osmo-pcap-server/osmo-pcap-server.cfg"]
 vty_app = apps[0]
 
 

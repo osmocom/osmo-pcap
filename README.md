@@ -5,7 +5,7 @@ but store them centrally at a dedicated note for further analysis. This
 might be needed for auditing, resolving conflicts, post processing or
 debugging a distributed system.
 
-The system consists out of the *osmo-pcap-client* to cpature traffic at a
+The system consists out of the *osmo-pcap-client* to capture traffic at a
 host and *osmo-pcap-server* to receive the traffic, store and rotate the
 traffic at a centralized server. There is a shell script to compress
 and expire old traces.

@@ -1,3 +1,13 @@
+osmo-pcap (0.1.2) unstable; urgency=medium
+
+  [ Oliver Smith ]
+  * Cosmetic: README.md: fix typo
+  * osmoappdesc.py: fix paths to configs
+  * Cosmetic: README.md: document how to run tests
+  * osmoappdesc.py: switch to python 3
+
+ -- Pau Espin Pedrol <pespin@sysmocom.de>  Thu, 02 Jan 2020 20:19:28 +0100
+
 osmo-pcap (0.1.1) unstable; urgency=medium
 
   * Remove undefined param passed to {logging,osmo_stats}_vty_add_cmds

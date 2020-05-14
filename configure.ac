@@ -145,6 +145,7 @@ AC_OUTPUT(
     src/Makefile
     contrib/Makefile
     contrib/systemd/Makefile
+    contrib/osmo-pcap.spec
     doc/Makefile
     doc/examples/Makefile
     tests/Makefile

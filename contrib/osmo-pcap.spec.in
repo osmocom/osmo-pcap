@@ -12,11 +12,8 @@
 # license that conforms to the Open Source Definition (Version 1.9)
 # published by the Open Source Initiative.
 
-# Please submit bugfixes or comments via http://bugs.opensuse.org/
-#
-
 Name:           osmo-pcap
-Version:        0.1.2.0
+Version:        @VERSION@
 Release:        0
 Summary:        Osmocom's PCAP client and server
 License:        AGPL-3.0-or-later AND GPL-2.0-or-later
@@ -27,6 +24,9 @@ BuildRequires:  autoconf
 BuildRequires:  automake >= 1.6
 BuildRequires:  libpcap-devel
 BuildRequires:  libtool
+%if 0%{?suse_version}
+BuildRequires:  systemd-rpm-macros
+%endif
 BuildRequires:  pkgconfig
 BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libosmocore) >= 0.11.0
@@ -34,6 +34,7 @@ BuildRequires:  pkgconfig(libosmogb)
 BuildRequires:  pkgconfig(libosmogsm) >= 0.11.0
 BuildRequires:  pkgconfig(libosmovty) >= 0.11.0
 BuildRequires:  pkgconfig(libzmq) >= 3.2.2
+%{?systemd_requires}
 
 %description
 Osmocom tools to help with pcap tracing.
@@ -53,6 +54,7 @@ make %{?_smp_mflags}
 %install
 %make_install
 
+%if 0%{?suse_version}
 %preun
 %service_del_preun osmo-pcap-client.service osmo-pcap-server.service
 
@@ -64,6 +66,7 @@ make %{?_smp_mflags}
 
 %post
 %service_add_post osmo-pcap-client.service osmo-pcap-server.service
+%endif
 
 %check
 make %{?_smp_mflags} check || (find . -name testsuite.log -exec cat {} +)

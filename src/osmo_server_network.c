@@ -542,7 +542,7 @@ static void new_connection(struct osmo_pcap_server *server,
 	} else {
 		client->rem_wq.bfd.cb = osmo_wqueue_bfd_cb;
 		client->rem_wq.bfd.data = client;
-		client->rem_wq.bfd.when = BSC_FD_READ;
+		client->rem_wq.bfd.when = OSMO_FD_READ;
 		client->rem_wq.read_cb = read_cb;
 		client->direct_read = true;
 	}
@@ -602,7 +602,7 @@ int osmo_pcap_server_listen(struct osmo_pcap_server *server)
 	}
 
 	server->listen_fd.fd = fd;
-	server->listen_fd.when = BSC_FD_READ;
+	server->listen_fd.when = OSMO_FD_READ;
 	server->listen_fd.cb = accept_cb;
 	server->listen_fd.data = server;
 

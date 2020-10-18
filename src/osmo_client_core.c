@@ -306,7 +306,7 @@ int osmo_client_capture(struct osmo_pcap_client *client, const char *device)
 	}
 
 	client->fd.fd = fd;
-	client->fd.when = BSC_FD_READ;
+	client->fd.when = OSMO_FD_READ;
 	client->fd.cb = pcap_read_cb;
 	client->fd.data = client;
 	if (osmo_fd_register(&client->fd) != 0) {

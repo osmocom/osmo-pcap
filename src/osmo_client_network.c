@@ -120,7 +120,7 @@ static void tls_error_cb(struct osmo_tls_session *session)
 int conn_cb(struct osmo_fd *fd, unsigned int what)
 {
 	/* finally the socket is connected... continue */
-	if (what & BSC_FD_WRITE) {
+	if (what & OSMO_FD_WRITE) {
 		struct osmo_pcap_client_conn *conn = fd->data;
 		/*
 		 * The write queue needs to work differently for GNUtls. Before we can
@@ -144,7 +144,7 @@ int conn_cb(struct osmo_fd *fd, unsigned int what)
 		}
 	}
 
-	if (what & BSC_FD_READ)
+	if (what & OSMO_FD_READ)
 		read_cb(fd);
 	return 0;
 }
@@ -284,7 +284,7 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 		srv_port = 0;
 		sock_type = SOCK_RAW;
 		sock_proto = IPPROTO_IPIP;
-		conn->wqueue.bfd.when = BSC_FD_WRITE;
+		conn->wqueue.bfd.when = OSMO_FD_WRITE;
 		break;
 	default:
 		OSMO_ASSERT(0);
@@ -306,9 +306,9 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 	conn->wqueue.bfd.cb = conn_cb;
 	conn->wqueue.bfd.data = conn;
 	if (conn->protocol == PROTOCOL_IPIP)
-		conn->wqueue.bfd.when = BSC_FD_WRITE;
+		conn->wqueue.bfd.when = OSMO_FD_WRITE;
 	else
-		conn->wqueue.bfd.when = BSC_FD_READ | BSC_FD_WRITE;
+		conn->wqueue.bfd.when = OSMO_FD_READ | OSMO_FD_WRITE;
 }
 
 void osmo_client_reconnect(struct osmo_pcap_client_conn *conn)

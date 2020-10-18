@@ -192,9 +192,9 @@ static int need_handshake(struct osmo_tls_session *tls_session)
 		/* handshake is done. start writing if we are allowed to */
 		LOGP(DTLS, LOGL_NOTICE, "TLS handshake done.\n");
 		if (!llist_empty(&tls_session->wqueue->msg_queue))
-			tls_session->wqueue->bfd.when = BSC_FD_WRITE | BSC_FD_READ;
+			tls_session->wqueue->bfd.when = OSMO_FD_WRITE | OSMO_FD_READ;
 		else
-			tls_session->wqueue->bfd.when = BSC_FD_READ;
+			tls_session->wqueue->bfd.when = OSMO_FD_READ;
 		tls_session->need_handshake = false;
 		release_keys(tls_session);
 		if (tls_session->handshake_done)
@@ -227,7 +227,7 @@ static int tls_read(struct osmo_tls_session *sess)
 static int tls_write(struct osmo_tls_session *sess)
 {
 	int rc;
-	sess->wqueue->bfd.when &= ~BSC_FD_WRITE;
+	sess->wqueue->bfd.when &= ~OSMO_FD_WRITE;
 
 	if (llist_empty(&sess->wqueue->msg_queue))
 		return 0;
@@ -252,7 +252,7 @@ static int tls_write(struct osmo_tls_session *sess)
 	}
 
 	if (sess->need_resend || !llist_empty(&sess->wqueue->msg_queue))
-		sess->wqueue->bfd.when |= BSC_FD_WRITE;
+		sess->wqueue->bfd.when |= OSMO_FD_WRITE;
 	return rc;
 }
 
@@ -263,14 +263,14 @@ int osmo_tls_client_bfd_cb(struct osmo_fd *fd, unsigned what)
 	if (sess->need_handshake)
 		return need_handshake(sess);
 
-	if (what & BSC_FD_READ) {
+	if (what & OSMO_FD_READ) {
 		int rc = tls_read(sess);
 		if (rc <= 0) {
 			sess->error(sess);
 			return rc;
 		}
 	}
-	if (what & BSC_FD_WRITE) {
+	if (what & OSMO_FD_WRITE) {
 		int rc = tls_write(sess);
 		if (rc < 0) {
 			sess->error(sess);
@@ -437,7 +437,7 @@ bool osmo_tls_init_server_session(struct osmo_pcap_conn *conn,
 					GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
 	wq->bfd.cb = osmo_tls_client_bfd_cb;
 	wq->bfd.data = sess;
-	wq->bfd.when = BSC_FD_READ | BSC_FD_WRITE;
+	wq->bfd.when = OSMO_FD_READ | OSMO_FD_WRITE;
 	sess->need_handshake = true;
 	sess->wqueue = wq;
 	return true;
@@ -533,7 +533,7 @@ bool osmo_tls_init_client_session(struct osmo_pcap_client_conn *client)
 					GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
 	wq->bfd.cb = osmo_tls_client_bfd_cb;
 	wq->bfd.data = sess;
-	wq->bfd.when = BSC_FD_READ | BSC_FD_WRITE;
+	wq->bfd.when = OSMO_FD_READ | OSMO_FD_WRITE;
 	sess->need_handshake = true;
 	sess->wqueue = wq;
 	return true;

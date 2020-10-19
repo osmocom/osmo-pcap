@@ -191,10 +191,9 @@ static int need_handshake(struct osmo_tls_session *tls_session)
 	if (rc == 0) {
 		/* handshake is done. start writing if we are allowed to */
 		LOGP(DTLS, LOGL_NOTICE, "TLS handshake done.\n");
+		osmo_fd_read_enable(&tls_session->wqueue->bfd);
 		if (!llist_empty(&tls_session->wqueue->msg_queue))
-			tls_session->wqueue->bfd.when = OSMO_FD_WRITE | OSMO_FD_READ;
-		else
-			tls_session->wqueue->bfd.when = OSMO_FD_READ;
+			osmo_fd_write_enable(&tls_session->wqueue->bfd);
 		tls_session->need_handshake = false;
 		release_keys(tls_session);
 		if (tls_session->handshake_done)
@@ -227,7 +226,7 @@ static int tls_read(struct osmo_tls_session *sess)
 static int tls_write(struct osmo_tls_session *sess)
 {
 	int rc;
-	sess->wqueue->bfd.when &= ~OSMO_FD_WRITE;
+	osmo_fd_write_disable(&sess->wqueue->bfd);
 
 	if (llist_empty(&sess->wqueue->msg_queue))
 		return 0;
@@ -252,7 +251,7 @@ static int tls_write(struct osmo_tls_session *sess)
 	}
 
 	if (sess->need_resend || !llist_empty(&sess->wqueue->msg_queue))
-		sess->wqueue->bfd.when |= OSMO_FD_WRITE;
+		osmo_fd_write_enable(&sess->wqueue->bfd);
 	return rc;
 }
 

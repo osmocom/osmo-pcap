@@ -267,6 +267,7 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 	int rc;
 	uint16_t srv_port;
 	int sock_type, sock_proto;
+	unsigned int when;
 
 	osmo_client_disconnect(conn);
 
@@ -279,18 +280,20 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 		srv_port = conn->srv_port;
 		sock_type = SOCK_STREAM;
 		sock_proto = IPPROTO_TCP;
+		when = OSMO_FD_READ | OSMO_FD_WRITE;
 		break;
 	case PROTOCOL_IPIP:
 		srv_port = 0;
 		sock_type = SOCK_RAW;
 		sock_proto = IPPROTO_IPIP;
-		conn->wqueue.bfd.when = OSMO_FD_WRITE;
+		when = OSMO_FD_WRITE;
 		break;
 	default:
 		OSMO_ASSERT(0);
 		break;
 	}
 
+	osmo_fd_setup(&conn->wqueue.bfd, -1, when, conn_cb, conn, 0);
 	rc = osmo_sock_init2_ofd(&conn->wqueue.bfd, AF_INET, sock_type, sock_proto,
 				conn->source_ip, 0, conn->srv_ip, srv_port,
 				OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT | OSMO_SOCK_F_NONBLOCK);
@@ -303,12 +306,6 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 	}
 
 	rate_ctr_inc(&conn->client->ctrg->ctr[CLIENT_CTR_CONNECT]);
-	conn->wqueue.bfd.cb = conn_cb;
-	conn->wqueue.bfd.data = conn;
-	if (conn->protocol == PROTOCOL_IPIP)
-		conn->wqueue.bfd.when = OSMO_FD_WRITE;
-	else
-		conn->wqueue.bfd.when = OSMO_FD_READ | OSMO_FD_WRITE;
 }
 
 void osmo_client_reconnect(struct osmo_pcap_client_conn *conn)

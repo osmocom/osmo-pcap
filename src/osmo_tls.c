@@ -435,9 +435,7 @@ bool osmo_tls_init_server_session(struct osmo_pcap_conn *conn,
 	gnutls_transport_set_int(sess->session, wq->bfd.fd);
 	gnutls_handshake_set_timeout(sess->session,
 					GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
-	wq->bfd.cb = osmo_tls_client_bfd_cb;
-	wq->bfd.data = sess;
-	wq->bfd.when = OSMO_FD_READ | OSMO_FD_WRITE;
+	osmo_fd_setup(&wq->bfd, wq->bfd.fd, OSMO_FD_READ | OSMO_FD_WRITE, osmo_tls_client_bfd_cb, sess, 0);
 	sess->need_handshake = true;
 	sess->wqueue = wq;
 	return true;
@@ -531,9 +529,7 @@ bool osmo_tls_init_client_session(struct osmo_pcap_client_conn *client)
 	gnutls_transport_set_int(sess->session, wq->bfd.fd);
 	gnutls_handshake_set_timeout(sess->session,
 					GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
-	wq->bfd.cb = osmo_tls_client_bfd_cb;
-	wq->bfd.data = sess;
-	wq->bfd.when = OSMO_FD_READ | OSMO_FD_WRITE;
+	osmo_fd_setup(&wq->bfd, wq->bfd.fd, OSMO_FD_READ | OSMO_FD_WRITE, osmo_tls_client_bfd_cb, sess, 0);
 	sess->need_handshake = true;
 	sess->wqueue = wq;
 	return true;

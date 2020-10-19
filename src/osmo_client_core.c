@@ -305,10 +305,7 @@ int osmo_client_capture(struct osmo_pcap_client *client, const char *device)
 		return 3;
 	}
 
-	client->fd.fd = fd;
-	client->fd.when = OSMO_FD_READ;
-	client->fd.cb = pcap_read_cb;
-	client->fd.data = client;
+	osmo_fd_setup(&client->fd, fd, OSMO_FD_READ, pcap_read_cb, client, 0);
 	if (osmo_fd_register(&client->fd) != 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
 		     "Failed to register the fd.\n");

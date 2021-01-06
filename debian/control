@@ -2,7 +2,14 @@ Source: osmo-pcap
 Section: unknown
 Priority: extra
 Maintainer: Holger Hans Peter Freyther <zecke@selfish.org>
-Build-Depends: debhelper (>= 7.0.50~), dh-autoreconf, autotools-dev, libpcap0.8-dev, pkg-config, libosmocore-dev, libgnutls28-dev, libzmq3-dev
+Build-Depends:	debhelper (>= 7.0.50~),
+		dh-autoreconf,
+		autotools-dev,
+		libpcap0.8-dev,
+		pkg-config,
+		libosmocore-dev,
+		libgnutls28-dev,
+		libzmq3-dev
 Standards-Version: 3.9.1
 Homepage: https://osmocom.org/projects/osmo-pcap
 Vcs-Git: git://git.osmocom.org/osmo-pcap.git

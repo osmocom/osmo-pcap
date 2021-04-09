@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML 5.0//EN"
+"http://docbook.org/xml/5.0/dtd/docbook.dtd" [
+<!ENTITY chapter-vty      SYSTEM      "./common/chapters/vty.xml" >
+<!ENTITY sections-vty     SYSTEM      "@@GENERATED@@" >
+]>
+
+<book>
+  <info>
+    <revhistory>
+        <revision>
+            <revnumber>v1</revnumber>
+            <date>@@REV_DATE@@</date>
+            <authorinitials>s.f.m.c.</authorinitials>
+            <revremark>Automatic build (@@REV_NUMBER@@)</revremark>
+        </revision>
+    </revhistory>
+
+    <title>OsmoPCAP VTY Reference</title>
+    <subtitle>@@VARIANT@@</subtitle>
+
+    <copyright>
+      <year>@@CR_YEAR@@</year>
+    </copyright>
+
+    <legalnotice>
+      <para>This work is copyright by <orgname>sysmocom - s.f.m.c. GmbH</orgname>. All rights reserved.
+      </para>
+    </legalnotice>
+  </info>
+
+  <!-- Main chapters-->
+  &chapter-vty;
+</book>

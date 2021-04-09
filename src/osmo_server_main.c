@@ -108,12 +108,41 @@ static void print_help()
 	printf("  -T --timestamp. Print a timestamp in the debug output.\n");
 	printf("  -e --log-level number. Set a global loglevel.\n");
 	printf("  -c --config-file filename The config file to use.\n");
+
+	printf("\nVTY reference generation:\n");
+	printf("     --vty-ref-mode MODE     VTY reference generation mode (e.g. 'expert').\n");
+	printf("     --vty-ref-xml           Generate the VTY reference XML output and exit.\n");
+}
+
+static void handle_long_options(const char *prog_name, const int long_option)
+{
+	static int vty_ref_mode = VTY_REF_GEN_MODE_DEFAULT;
+	switch (long_option) {
+	case 1:
+		vty_ref_mode = get_string_value(vty_ref_gen_mode_names, optarg);
+		if (vty_ref_mode < 0) {
+			fprintf(stderr, "%s: Unknown VTY reference generation "
+				"mode '%s'\n", prog_name, optarg);
+			exit(2);
+		}
+		break;
+	case 2:
+		fprintf(stderr, "Generating the VTY reference in mode '%s' (%s)\n",
+			get_value_string(vty_ref_gen_mode_names, vty_ref_mode),
+			get_value_string(vty_ref_gen_mode_desc, vty_ref_mode));
+		vty_dump_xml_ref_mode(stdout, (enum vty_ref_gen_mode) vty_ref_mode);
+		exit(0);
+	default:
+		fprintf(stderr, "%s: error parsing cmdline options\n", prog_name);
+		exit(2);
+	}
 }
 
 static void handle_options(int argc, char **argv)
 {
 	while (1) {
 		int option_index = 0, c;
+		static int long_option = 0;
 		static struct option long_options[] = {
 			{"help", 0, 0, 'h'},
 			{"daemonize", 0, 0, 'D'},
@@ -122,6 +151,8 @@ static void handle_options(int argc, char **argv)
 			{"timestamp", 0, 0, 'T'},
 			{"log-level", 1, 0, 'e'},
 			{"config-file", 1, 0, 'c'},
+			{"vty-ref-mode", 1, &long_option, 1},
+			{"vty-ref-xml", 0, &long_option, 2},
 			{0, 0, 0, 0}
 		};
 
@@ -135,6 +166,9 @@ static void handle_options(int argc, char **argv)
 			print_usage();
 			print_help();
 			exit(0);
+		case 0:
+			handle_long_options(argv[0], long_option);
+			break;
 		case 'D':
 			daemonize = 1;
 			break;
@@ -210,6 +244,7 @@ int main(int argc, char **argv)
 	vty_init(&vty_info);
 	logging_vty_add_cmds();
 	osmo_stats_vty_add_cmds();
+	vty_server_init(tall_srv_ctx);
 
 	/* parse options */
 	handle_options(argc, argv);
@@ -249,7 +284,6 @@ int main(int argc, char **argv)
 	pcap_server->base_path = talloc_strdup(pcap_server, "./");
 	pcap_server->max_size = 1073741824;
 	pcap_server->max_snaplen = DEFAULT_SNAPLEN;
-	vty_server_init(pcap_server);
 
 	if (vty_read_config_file(config_file, NULL) < 0) {
 		LOGP(DSERVER, LOGL_ERROR,

@@ -41,6 +41,11 @@ $MAKE check || cat-testlogs.sh
 DISTCHECK_CONFIGURE_FLAGS="--with-pcap-config=/bin/true" \
         PCAP_LIBS="-lpcap" PCAP_CFLAGS="" \
         $MAKE distcheck || cat-testlogs.sh
+
+if [ "$WITH_MANUALS" = "1" ] && [ "$PUBLISH" = "1" ]; then
+	make -C "$base/doc/manuals" publish
+fi
+
 $MAKE maintainer-clean
 
 osmo-clean-workspace.sh

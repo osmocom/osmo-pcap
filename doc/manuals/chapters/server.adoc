@@ -1,0 +1,90 @@
+== osmo-pcap-server
+
+The osmo-pcap-server program can run anywhere in your network, as long
+as it can be reached by the remote osmo-pcap-client instances.
+
+=== Running osmo-pcap-server
+
+==== SYNOPSIS
+
+*osmo-pcap-server* [-D] [-c CFG_FILE] | -h | -V
+
+==== OPTIONS
+
+*-h, --help*::
+  Print a short help message about the supported options.
+*-V, --version*::
+  Print the compile-time version number of the program.
+*-D, --daemonize*::
+  Fork the process as a daemon into background.
+*-c, --config-file 'CONFIGFILE'*::
+  Specify the file and path name of the configuration file to be
+  used. If none is specified, use `osmo-pcap-client.cfg` in the current
+  working directory.
+
+As osmo-pcap-server doesn't capture any packets itself and only receives streams of
+captured packets from [remote] osmo-pcap-clients, there is no need to run it as root
+or with elevated privileges.
+
+=== Configuring osmo-pcap-server
+
+The osmo-pcap-server configuration consists mainly of the following parts:
+
+* the global server configuration, optionally including TLS related settings
+* the per-client (per-connection) configuration
+
+.osmo-pcap-server example global configuration
+----
+server
+ base-path /var/lib/osmo-pcap-server <1>
+ server ip 192.168.11.20 <2>
+ server port 54321 <3>
+ max-file-size 100000000 <4>
+ max-snaplen 100000 <5>
+----
+<1> directory to which the pcap files are stored
+<2> IP address to which to bind/listen
+<3> TCP port number to which to bind/listen
+<4> maximum size for pcap files; create a new file once max-file-size is reached
+<5> maximum pcap snapshot length (per packet, in bytes; default: 9000)
+
+The received packets are stored to a pcap file below the `base-path` using a filename
+encoding both the client name and the date/time at time of file creation.
+
+.osmo-pcap-server example global configuration
+----
+server
+ client foo 192.168.100.1 <1>
+ client bar 192.168.200.2 tls <2>
+----
+<1> Client `foo` connects from 192.168.100.1 and uses no TLS
+<2> Client `bar` connects from 192.168.2.00.2 and uses TLS
+
+=== Configuring TLS
+
+By default, the captured packets are received in plain-text without any additional
+layer of encryption or authentication.  This means that there is no confidentiality,
+nor any integrity protection, unless the original captured packet already featured
+such properties.
+
+If desired, `osmo-pcap-server` can be configured to use TLS (transport layer security)
+on the protocol between client and server.
+
+TLS is configured separately for each remote server, whether primary or additional.
+
+NOTE:: osmo-pcap-server uses the gnutls library for TLS support.  See its documentation in terms of supported file formats for CRL, certificates, keys, etc.
+
+.osmo-pcap-server configuration with TLS
+----
+server
+ tls allow-auth x509 <1>
+ tls capath /etc/osmocom/osmo-pcap-ca <2>
+ tls crlfile /etc/osmocom/osmo-pcap-ca.crl <3>
+ tls server-cert /etc/osmocom/osmo-pcap-server.crt <4>
+ tls server-key /etc/osmocom/osmo-pcap-server.key <5>
+----
+<1> require clients to authenticate using a X.509 client certificate
+<2> path of all CA certificates we consider valid for signing the client cert
+<3> file containing the certificate revocation list
+<4> file containing the server certificate
+<5> file containing the private key for the server certificate

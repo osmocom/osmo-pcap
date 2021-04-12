@@ -1,0 +1,132 @@
+== osmo-pcap-client
+
+The osmo-pcap-client program runs at a location of your network
+where you would like to record some packets.  It captures those
+packets (with or without filter) and forwards them to one or multiple
+remote servers.
+
+=== Running osmo-pcap-client
+
+==== SYNOPSIS
+
+*osmo-pcap-client* [-D] [-c CFG_FILE] | -h | -V
+
+==== OPTIONS
+
+*-h, --help*::
+  Print a short help message about the supported options.
+*-V, --version*::
+  Print the compile-time version number of the program.
+*-D, --daemonize*::
+  Fork the process as a daemon into background.
+*-c, --config-file 'CONFIGFILE'*::
+  Specify the file and path name of the configuration file to be
+  used. If none is specified, use `osmo-pcap-client.cfg` in the current
+  working directory.
+
+Capturing network packets requires you to be superuser or have the CAP_NET_RAW capability.
+
+There are several options to achieve this:
+
+- start the program as root user (strongly discouraged)
+- globally enable the CAP_NET_RAW capability for the program using e.g. the tool `setcap`
+- asking `systemd` to start the program with the required capability
+
+NOTE:: This potentially opens a privilege escalation, as `osmo-pcap-client` can be configured
+via the VTY interface (telnet) which is by default accessible by any user on the local machine (access to the loopback device).  Please make sure to protect access to the VTY interface accordingly.
+
+
+=== Configuring the packet capture
+
+The VTY configuration node of osmo-pcap-client contains a `client` node,
+in which the packet capturing is configured
+
+.osmo-pcap-client VTY configuration for packet capture
+----
+client
+ pcap device eth0 <1>
+ pcap filter udp port 23000 <2>
+ pcap detect-loop 1 <3>
+----
+<1> the network device from which to obtain a capture
+<2> the libpcap filter string (`udp port 23000` in this example)
+<3> instruct osmo-pcap-client to automatically add a filter that prevents capturing
+    the traffic between osmo-pcap-client and osmo-pcap-server, which would create a loop.
+
+
+=== Configuring the primary server
+
+.osmo-pcap-client configuration for the primary remote server
+----
+client
+ server ip 192.168.11.20 <1>
+ server port 54321 <2>
+ source ip 192.168.11.1 <3>
+----
+<1> IP address of the server to which to send the traces
+<2> port number of the server to which to send the traces
+<3> local IP address to use when sending traffic to the server
+
+By default, a custom osmo-pcap specific protocol is used to transport
+the captured packets from client to server.  However, the `protocol`
+VTY configuration command can be used to switch to to using a simple `ipip`
+encapsulation.  `ipip` can be transparently decoded by protocol analysis
+tools like wireshark.
+
+
+=== Configuring additional servers
+
+In some use cases, you may want to send the captured packets to multiple
+remote destinations.
+
+The primary and each of the remote destinations each receive a copy
+of each captured packet.
+
+.osmo-pcap-client configuration for an additional remote server
+----
+client
+ pcap-store-connection my_server <1>
+  server ip 192.168.11.10 <2>
+  server port 54321 <3>
+  source ip 192.168.11.1 <4>
+  connect <5>
+----
+<1> a human-readable identifier for this specific connection (`my_server`)
+<2> IP address of the server to which to send the traces
+<3> port number of the server to which to send the traces
+<4> local IP address to use when sending traffic to the server
+<5> request connection to the remote server specified in this section
+
+
+=== Configuring TLS
+
+By default, the captured packets are sent in plain-text without any additional
+layer of encryption or authentication.  This means that there is no confidentiality,
+nor any integrity protection, unless the original captured packet already featured
+such properties.
+
+If desired, `osmo-pcap-client` can be configured to use TLS (transport layer security)
+on the protocol between client and server.
+
+TLS is configured separately for each remote server, whether primary or additional.
+
+.osmo-pcap-client configuration with TLS
+----
+client
+ server ip 192.168.11.20
+ server port 54321
+ source ip 192.168.11.1
+ enable tls <1>
+ tls hostname pcapserver.example.test<2>
+ tls verify-cert <3>
+ tls capath /etc/osmo-pcap/ca-certificates <4>
+ tls client-cert /etc/osmo-pcap/client.crt <5>
+ tls client-key /etc/osmo-pcap/client.key <6>
+----
+<1> enable TLS for this server
+<2> set the hostname we expect the server to have a certificate for
+<3> enable certificate verification
+<4> path of all CA certificates we consider valid for signing the server cert
+<5> file containing the client certificate
+<6> file containing the private key for the client certificate
+

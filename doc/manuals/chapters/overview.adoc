@@ -1,0 +1,43 @@
+[[overview]]
+== OsmoPCAP Overview
+
+=== Package Capturing in distributed telecoms networks
+
+Obtaining raw, binary protocol traces [for later analysis] is an
+essential capability in order to investigate any kind of problem
+in any computer networking system.
+
+The very distributed, heterogenuous nature of cellular networks
+(compared to end-to-end IP networks) results in a lot of relevant
+information being present only at some specific interfaces / points
+in the network.  This in turn means that packet captures have to
+be performed at a variety of different network elements in order
+to get the full picture of what is happening.
+
+Recording protocol traces at various different points in the network
+inevitably raises the question of how to aggregate these.
+
+[[about]]
+=== About OsmoPCAP
+
+OsmoPCAP is a software suite consisting of two programs, a client and a
+server component.
+
+- osmo-pcap-client obtains protocol traces by using AF_PACKET sockets,
+  optionally with a capture filter.  It then forwards the captures to
+  a remote server.
+- osmo-pcap-server accepts incoming connections from clients. It
+  receives captured packets from those clients and stores them.
+
+The server and client communicate using a custom, TCP based protocol
+for passing captured packets from client to server.  Based on your
+configuration, it can optionally be secured by TLS transport-level
+encryption and authentication.
+
+NOTE:: The osmo-pcap programs runs as normal, single-threaded userspace
+programs, without any specific emphasis on efficiency.  It doesn't use
+any of the advanced zero-copy mechanisms available on many modern OSs.
+The goal is to capture telecom signaling (control plane) traffic, whose
+bandwidth is (unlike that of the user plane) typically relatively low
+compared to the available CPU / IO speeds.  Don't expect osmo-pcap to
+handle wire-rate multi-gigabit throughput.

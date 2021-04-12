@@ -46,13 +46,13 @@ static struct osmo_pcap_client_conn *get_conn(struct vty *vty)
 
 static struct cmd_node client_node = {
 	CLIENT_NODE,
-	"%s(client)#",
+	"%s(client)# ",
 	1,
 };
 
 static struct cmd_node server_node = {
 	CLIENT_SERVER_NODE,
-	"%s(server)#",
+	"%s(server)# ",
 	1,
 };
 

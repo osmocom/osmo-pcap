@@ -519,7 +519,7 @@ DEFUN(cfg_client_protocol,
 }
 
 
-int vty_client_init(struct osmo_pcap_client *pcap)
+int vty_client_init(void)
 {
 	install_element(CONFIG_NODE, &cfg_client_cmd);
 	install_node(&client_node, config_write_client);

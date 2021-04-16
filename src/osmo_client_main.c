@@ -234,7 +234,7 @@ int main(int argc, char **argv)
 	logging_vty_add_cmds();
 	osmo_stats_vty_add_cmds();
 	osmo_talloc_vty_add_cmds();
-	vty_client_init(tall_cli_ctx);
+	vty_client_init();
 
 	/* parse options */
 	handle_options(argc, argv);

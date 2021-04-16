@@ -513,7 +513,7 @@ DEFUN(cfg_tls_dh_generate,
 	return CMD_SUCCESS;
 }
 
-void vty_server_init(struct osmo_pcap_server *server)
+void vty_server_init(void)
 {
 	install_element(CONFIG_NODE, &cfg_server_cmd);
 	install_node(&server_node, config_write_server);

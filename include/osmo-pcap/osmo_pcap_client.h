@@ -107,7 +107,7 @@ struct osmo_pcap_client {
 extern struct osmo_pcap_client *pcap_client;
 
 struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx);
-int vty_client_init(struct osmo_pcap_client *);
+int vty_client_init(void);
 
 int osmo_client_capture(struct osmo_pcap_client *client, const char *device);
 int osmo_client_filter(struct osmo_pcap_client *client, const char *filter);

@@ -34,6 +34,7 @@
 #include <osmocom/vty/logging.h>
 #include <osmocom/vty/telnet_interface.h>
 #include <osmocom/vty/stats.h>
+#include <osmocom/vty/misc.h>
 
 #include <pcap.h>
 #include <signal.h>
@@ -241,9 +242,11 @@ int main(int argc, char **argv)
 	osmo_init_logging2(tall_srv_ctx, &log_info);
 
 	vty_info.copyright = osmopcap_copyright;
+	vty_info.tall_ctx = tall_srv_ctx;
 	vty_init(&vty_info);
 	logging_vty_add_cmds();
 	osmo_stats_vty_add_cmds();
+	osmo_talloc_vty_add_cmds();
 	vty_server_init(tall_srv_ctx);
 
 	/* parse options */

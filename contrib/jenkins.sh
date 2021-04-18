@@ -24,6 +24,13 @@ export PKG_CONFIG_PATH="$inst/lib/pkgconfig:$PKG_CONFIG_PATH"
 export LD_LIBRARY_PATH="$inst/lib"
 osmo-build-dep.sh libosmocore "" '--disable-doxygen --enable-gnutls'
 
+# Additional configure options and depends
+CONFIG=""
+if [ "$WITH_MANUALS" = "1" ]; then
+	osmo-build-dep.sh osmo-gsm-manuals
+	CONFIG="--enable-manuals"
+fi
+
 set +x
 echo
 echo
@@ -35,10 +42,14 @@ set -x
 
 cd "$base"
 autoreconf --install --force
-PCAP_LIBS="-lpcap" PCAP_CFLAGS="" ./configure --with-pcap-config=/bin/true --enable-sanitize --enable-werror
+PCAP_LIBS="-lpcap" PCAP_CFLAGS="" ./configure \
+	--with-pcap-config=/bin/true \
+	--enable-sanitize \
+	--enable-werror \
+	$CONFIG
 $MAKE $PARALLEL_MAKE
 $MAKE check || cat-testlogs.sh
-DISTCHECK_CONFIGURE_FLAGS="--with-pcap-config=/bin/true" \
+DISTCHECK_CONFIGURE_FLAGS="--with-pcap-config=/bin/true $CONFIG" \
         PCAP_LIBS="-lpcap" PCAP_CFLAGS="" \
         $MAKE distcheck || cat-testlogs.sh
 

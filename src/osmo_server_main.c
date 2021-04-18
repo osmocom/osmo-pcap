@@ -104,6 +104,7 @@ static void print_help()
 	printf("  Some useful help...\n");
 	printf("  -h --help this text\n");
 	printf("  -D --daemonize Fork the process into a background daemon\n");
+	printf("  -V --version Print the version number\n");
 	printf("  -d option --debug=DRLL:DCC:DMM:DRR:DRSL:DNM enable debugging\n");
 	printf("  -s --disable-color\n");
 	printf("  -T --timestamp. Print a timestamp in the debug output.\n");
@@ -148,6 +149,7 @@ static void handle_options(int argc, char **argv)
 			{"help", 0, 0, 'h'},
 			{"daemonize", 0, 0, 'D'},
 			{"debug", 1, 0, 'd'},
+			{"version", 0, 0, 'V'},
 			{"disable-color", 0, 0, 's'},
 			{"timestamp", 0, 0, 'T'},
 			{"log-level", 1, 0, 'e'},
@@ -176,6 +178,9 @@ static void handle_options(int argc, char **argv)
 		case 'd':
 			log_parse_category_mask(osmo_stderr_target, optarg);
 			break;
+		case 'V':
+			print_version(1);
+			exit(0);
 		case 's':
 			log_set_use_color(osmo_stderr_target, 0);
 			break;

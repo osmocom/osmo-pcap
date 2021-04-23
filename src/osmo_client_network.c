@@ -293,10 +293,8 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 		break;
 	}
 
-	osmo_fd_setup(&conn->wqueue.bfd, -1, when, conn_cb, conn, 0);
-	rc = osmo_sock_init2_ofd(&conn->wqueue.bfd, AF_INET, sock_type, sock_proto,
-				conn->source_ip, 0, conn->srv_ip, srv_port,
-				OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT | OSMO_SOCK_F_NONBLOCK);
+	rc = osmo_sock_init2(AF_INET, sock_type, sock_proto, conn->source_ip, 0, conn->srv_ip, srv_port,
+			     OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT | OSMO_SOCK_F_NONBLOCK);
 	if (rc < 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
 		     "Failed to connect conn=%s to %s:%d\n",
@@ -304,6 +302,8 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 		lost_connection(conn);
 		return;
 	}
+	osmo_fd_setup(&conn->wqueue.bfd, rc, when, conn_cb, conn, 0);
+	osmo_fd_register(&conn->wqueue.bfd);
 
 	rate_ctr_inc(&conn->client->ctrg->ctr[CLIENT_CTR_CONNECT]);
 }

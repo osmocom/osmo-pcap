@@ -1,3 +1,25 @@
+osmo-pcap (0.2.0) unstable; urgency=medium
+
+  [ Harald Welte ]
+  * vty: Add space after prompt, as customary
+  * add "--version" to osmo-pcap-client and -server
+  * update copyright statement; Holger worked on it until 2017
+  * Add user manual for osmo-pcap
+  * use osmo_wqueue_enqueue_quiet() as we log anyway
+  * client: Ensure the "file" header is sent on connect
+  * use telnet_init_dynif() to allow VTY bind to non-loopack address
+  * vty: call telnet_init_dynif() after config file is read
+
+  [ Joachim Steiger ]
+  * manuals: generate VTY reference for osmo-pcap-{client,server}
+
+  [ Vadim Yanitskiy ]
+  * vty: register commands for talloc context introspection
+  * vty_{client,server}_init(): remove unused argument
+  * contrib/jenkins.sh: fix: pass '--enable-manuals' to configure
+
+ -- Harald Welte <laforge@osmocom.org>  Sat, 24 Apr 2021 23:03:34 +0200
+
 osmo-pcap (0.1.3) unstable; urgency=medium
 
   [ Oliver Smith ]

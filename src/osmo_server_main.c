@@ -271,12 +271,6 @@ int main(int argc, char **argv)
 
 	osmo_tls_init();
 
-	rc = telnet_init_dynif(tall_srv_ctx, NULL, vty_get_bind_addr(), OSMO_VTY_PORT_PCAP_SERVER);
-	if (rc < 0) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to bind telnet interface\n");
-		exit(1);
-	}
-
 	pcap_server = talloc_zero(tall_srv_ctx, struct osmo_pcap_server);
 	if (!pcap_server) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to allocate osmo_pcap_server.\n");
@@ -296,6 +290,12 @@ int main(int argc, char **argv)
 	if (vty_read_config_file(config_file, NULL) < 0) {
 		LOGP(DSERVER, LOGL_ERROR,
 		     "Failed to parse the config file: %s\n", config_file);
+		exit(1);
+	}
+
+	rc = telnet_init_dynif(tall_srv_ctx, NULL, vty_get_bind_addr(), OSMO_VTY_PORT_PCAP_SERVER);
+	if (rc < 0) {
+		LOGP(DCLIENT, LOGL_ERROR, "Failed to bind telnet interface\n");
 		exit(1);
 	}
 

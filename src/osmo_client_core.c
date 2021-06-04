@@ -161,7 +161,7 @@ static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 
 	data = pcap_next(client->handle, &hdr);
 	if (!data) {
-		rate_ctr_inc(&client->ctrg->ctr[CLIENT_CTR_PERR]);
+		rate_ctr_inc(rate_ctr_group_get_ctr(client->ctrg, CLIENT_CTR_PERR));
 		return -1;
 	}
 
@@ -190,14 +190,14 @@ static void add_psbl_wrapped_ctr(struct osmo_pcap_client *client,
 	 * Only issue is we don't know sizeof(u_int)
 	 */
 	if (*old_val > new_val) {
-		rate_ctr_add(&client->ctrg->ctr[ctr], P_CAP_UINT_MAX() - *old_val);
-		rate_ctr_add(&client->ctrg->ctr[ctr], new_val);
+		rate_ctr_add(rate_ctr_group_get_ctr(client->ctrg, ctr), P_CAP_UINT_MAX() - *old_val);
+		rate_ctr_add(rate_ctr_group_get_ctr(client->ctrg, ctr), new_val);
 		*old_val = new_val;
 		return;
 	}
 
 	/* Just increment it */
-	rate_ctr_add(&client->ctrg->ctr[ctr], new_val - *old_val);
+	rate_ctr_add(rate_ctr_group_get_ctr(client->ctrg, ctr), new_val - *old_val);
 	*old_val = new_val;
 }
 
@@ -215,7 +215,7 @@ static void pcap_check_stats_cb(void *_client)
 	if (rc != 0) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to query pcap stats: %s\n",
 			pcap_geterr(client->handle));
-		rate_ctr_inc(&client->ctrg->ctr[CLIENT_CTR_PERR]);
+		rate_ctr_inc(rate_ctr_group_get_ctr(client->ctrg, CLIENT_CTR_PERR));
 		return;
 	}
 

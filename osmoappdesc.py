@@ -22,8 +22,8 @@ app_configs = {
 }
 
 apps = [
-    (4238, "src/osmo-pcap-server", "OsmoPCAPServer", "osmo-pcap-server"),
-    (4237, "src/osmo-pcap-client", "OsmoPCAPClient", "osmo-pcap-client"),
+    (4228, "src/osmo-pcap-server", "OsmoPCAPServer", "osmo-pcap-server"),
+    (4227, "src/osmo-pcap-client", "OsmoPCAPClient", "osmo-pcap-client"),
         ]
 
 vty_command = ["src/osmo-pcap-server", "-c", "doc/examples/osmo-pcap-server/osmo-pcap-server.cfg"]

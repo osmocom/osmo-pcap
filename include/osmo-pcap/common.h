@@ -32,10 +32,10 @@
 
 /* support old versions of libosmocore */
 #ifndef OSMO_VTY_PORT_PCAP_CLIENT
-#define OSMO_VTY_PORT_PCAP_CLIENT	4237
+#define OSMO_VTY_PORT_PCAP_CLIENT	4227
 #endif
 #ifndef OSMO_VTY_PORT_PCAP_SERVER
-#define OSMO_VTY_PORT_PCAP_SERVER	4238
+#define OSMO_VTY_PORT_PCAP_SERVER	4228
 #endif
 
 enum {

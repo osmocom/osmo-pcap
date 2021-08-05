@@ -1,7 +1,7 @@
 # osmo-pcap distributed network capture
 
 osmo-pcap has been created to collect network traces at different nodes
-but store them centrally at a dedicated note for further analysis. This
+but store them centrally at a dedicated node for further analysis. This
 might be needed for auditing, resolving conflicts, post processing or
 debugging a distributed system.
 

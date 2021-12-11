@@ -158,7 +158,6 @@ AC_SUBST([PCAP_CFLAGS])
 
 dnl checks for libraries
 PKG_CHECK_MODULES(LIBOSMOCORE, libosmocore >= 1.6.0)
-PKG_CHECK_MODULES(LIBOSMOGB, libosmogb >= 1.6.0)
 PKG_CHECK_MODULES(LIBOSMOGSM, libosmogsm >= 1.6.0)
 PKG_CHECK_MODULES(LIBOSMOVTY, libosmovty >= 1.6.0)
 PKG_CHECK_MODULES(LIBZMQ, libzmq >= 3.2.2)

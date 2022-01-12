@@ -284,6 +284,7 @@ int main(int argc, char **argv)
 
 	INIT_LLIST_HEAD(&pcap_server->conn);
 	pcap_server->base_path = talloc_strdup(pcap_server, "./");
+	pcap_server->permission_mask = 0440;
 	pcap_server->max_size = 1073741824;
 	pcap_server->max_snaplen = DEFAULT_SNAPLEN;
 

@@ -88,6 +88,7 @@ static int config_write_server(struct vty *vty)
 
 	if (pcap_server->base_path)
 		vty_out(vty, " base-path %s%s", pcap_server->base_path, VTY_NEWLINE);
+	vty_out(vty, " file-permission-mask 0%o%s", pcap_server->permission_mask, VTY_NEWLINE);
 	if (pcap_server->addr)
 		vty_out(vty, " server ip %s%s", pcap_server->addr, VTY_NEWLINE);
 	if (pcap_server->port > 0)
@@ -130,6 +131,46 @@ DEFUN(cfg_server_base,
 	talloc_free(pcap_server->base_path);
 	pcap_server->base_path = talloc_strdup(pcap_server, argv[0]);
 	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_server_file_permission_mask,
+      cfg_server_file_permission_mask_cmd,
+      "file-permission-mask MODE",
+      "Permission mask to use when creating pcap files\n"
+      "The file permission mask, in octal format (default: 0440)\n")
+{
+	unsigned long long val;
+	char *endptr;
+
+	errno = 0;
+	val = strtoul(argv[0], &endptr, 8);
+
+	switch (errno) {
+	case 0:
+		break;
+	case ERANGE:
+	case EINVAL:
+	default:
+		goto ret_invalid;
+	}
+	if (!endptr || *endptr) {
+		/* No chars were converted */
+		if (endptr == argv[0])
+			goto ret_invalid;
+		/* Or there are surplus chars after the converted number */
+		goto ret_invalid;
+	}
+
+	/* 'man mode_t': "According to POSIX, it shall be an integer type." */
+	if (val > INT_MAX)
+		goto ret_invalid;
+
+	pcap_server->permission_mask = val;
+	return CMD_SUCCESS;
+
+ret_invalid:
+	vty_out(vty, "%% File permission mask out of range: '%s'%s", argv[0], VTY_NEWLINE);
+	return CMD_WARNING;
 }
 
 DEFUN(cfg_server_ip,
@@ -519,6 +560,7 @@ void vty_server_init(void)
 	install_node(&server_node, config_write_server);
 
 	install_element(SERVER_NODE, &cfg_server_base_cmd);
+	install_element(SERVER_NODE, &cfg_server_file_permission_mask_cmd);
 	install_element(SERVER_NODE, &cfg_server_ip_cmd);
 	install_element(SERVER_NODE, &cfg_server_port_cmd);
 	install_element(SERVER_NODE, &cfg_server_max_size_cmd);

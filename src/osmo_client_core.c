@@ -341,7 +341,7 @@ void osmo_client_conn_init(struct osmo_pcap_client_conn *conn,
 {
 	conn->client = client;
 	conn->tls_verify = true;
-	osmo_wqueue_init(&conn->wqueue, 1000);
+	osmo_wqueue_init(&conn->wqueue, WQUEUE_MAXLEN_DEFAULT);
 	conn->wqueue.bfd.fd = -1;
 }
 

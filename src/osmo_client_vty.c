@@ -104,6 +104,10 @@ static void write_client_conn_data(
 	if (conn->protocol != PROTOCOL_OSMOPCAP)
 		vty_out(vty, "%s protocol %s%s", indent,
 			get_value_string(osmopcap_protocol_names, conn->protocol), VTY_NEWLINE);
+
+	if (conn->wqueue.max_length != WQUEUE_MAXLEN_DEFAULT)
+		vty_out(vty, "%s wqueue max-length %u%s", indent,
+			conn->wqueue.max_length, VTY_NEWLINE);
 }
 
 static int config_write_server(struct vty *vty)
@@ -518,6 +522,18 @@ DEFUN(cfg_client_protocol,
 	return CMD_SUCCESS;
 }
 
+DEFUN(cfg_wqueue_maxlength,
+      cfg_wqueue_maxlength_cmd,
+      "wqueue max-length <1-4294967295>",
+      "Configure the write-queue used for transfer\n"
+      "Configure the maximum amount of packets to be stored in the write-queue\n"
+      "Maximum amount of packets before dropping starts\n")
+{
+	struct osmo_pcap_client_conn *conn = get_conn(vty);
+
+	conn->wqueue.max_length = atoi(argv[0]);
+	return CMD_SUCCESS;
+}
 
 int vty_client_init(void)
 {
@@ -535,6 +551,7 @@ int vty_client_init(void)
 	install_element(CLIENT_NODE, &cfg_server_port_cmd);
 	install_element(CLIENT_NODE, &cfg_source_ip_cmd);
 	install_element(CLIENT_NODE, &cfg_protocol_cmd);
+	install_element(CLIENT_NODE, &cfg_wqueue_maxlength_cmd);
 
 	install_element(CLIENT_NODE, &cfg_enable_tls_cmd);
 	install_element(CLIENT_NODE, &cfg_disable_tls_cmd);

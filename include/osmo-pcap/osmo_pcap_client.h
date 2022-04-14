@@ -32,6 +32,8 @@
 
 struct rate_ctr_group;
 
+#define WQUEUE_MAXLEN_DEFAULT 1000
+
 enum {
 	CLIENT_CTR_CONNECT,
 	CLIENT_CTR_BYTES,

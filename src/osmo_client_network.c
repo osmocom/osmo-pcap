@@ -59,7 +59,8 @@ static void lost_connection(struct osmo_pcap_client_conn *conn)
 static void write_data(struct osmo_pcap_client_conn *conn, struct msgb *msg)
 {
 	if (osmo_wqueue_enqueue_quiet(&conn->wqueue, msg) != 0) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to enqueue conn=%s\n", conn->name);
+		LOGP(DCLIENT, LOGL_ERROR, "Failed to enqueue conn=%s (capacity: %u/%u)\n",
+			 conn->name, conn->wqueue.current_length, conn->wqueue.max_length);
 		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_QERR));
 		msgb_free(msg);
 		return;

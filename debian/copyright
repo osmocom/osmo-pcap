@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: OsmoPCAP
-Source: http://cgit.osmocom.org/osmo-pcap/
+Source: https://gitea.osmocom.org/osmocom/osmo-pcap
 
 Files: *
 Copyright: 2011 Holger Freyther and On-Waves

@@ -12,8 +12,8 @@ Build-Depends:	debhelper (>= 7.0.50~),
 		libzmq3-dev (>= 3.2.2)
 Standards-Version: 3.9.1
 Homepage: https://osmocom.org/projects/osmo-pcap
-Vcs-Git: git://git.osmocom.org/osmo-pcap.git
-Vcs-Browser: http://git.osmocom.org/osmo-pcap/
+Vcs-Git: https://gitea.osmocom.org/osmocom/osmo-pcap
+Vcs-Browser: https://gitea.osmocom.org/osmocom/osmo-pcap
 
 Package: osmo-pcap-client
 Architecture: any

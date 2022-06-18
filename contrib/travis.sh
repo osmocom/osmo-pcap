@@ -5,7 +5,7 @@ set -ex
 rm -rf deps/install
 mkdir deps || true
 cd deps
-git clone git://git.osmocom.org/libosmocore
+git clone https://gitea.osmocom.org/osmocom/libosmocore
 
 cd libosmocore
 git reset --hard 460f9ef7da1db11b104fdfe635ebcbd8a071f205
@@ -15,7 +15,7 @@ make -j 4 install
 export LD_LIBRARY_PATH=$PWD/../install/lib
 
 cd ../
-git clone git://git.osmocom.org/python/osmo-python-tests
+git clone https://gitea.osmocom.org/cellular-infrastructure/osmo-python-tests
 cd osmo-python-tests
 sudo ./setup.py install
 

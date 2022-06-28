@@ -1,3 +1,16 @@
+osmo-pcap (0.4.0) unstable; urgency=medium
+
+  [ Pau Espin Pedrol ]
+  * client: Increase wqueue transmit length
+  * client: Log wqueue capacity when failing to enqueue
+  * client: Add 'wqueue max-length <0-4294967295>' VTY command
+  * .gitignore: blacklist configure~
+
+  [ Harald Welte ]
+  * update git URLs (git -> https; gitea)
+
+ -- Pau Espin Pedrol <pespin@sysmocom.de>  Tue, 28 Jun 2022 17:36:44 +0200
+
 osmo-pcap (0.3.0) unstable; urgency=medium
 
   [ Vadim Yanitskiy ]

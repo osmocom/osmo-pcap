@@ -4,6 +4,8 @@ Description=PCAP Server for the PCAP aggregation
 [Service]
 Type=simple
 Restart=always
+StateDirectory=osmocom
+WorkingDirectory=%S/osmocom
 ExecStart=/usr/bin/osmo-pcap-server -c /etc/osmocom/osmo-pcap-server.cfg
 RestartSec=2
 

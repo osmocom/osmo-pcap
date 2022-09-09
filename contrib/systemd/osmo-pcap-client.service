@@ -4,6 +4,8 @@ Description=PCAP Client for the PCAP aggregation
 [Service]
 Type=simple
 Restart=always
+StateDirectory=osmocom
+WorkingDirectory=%S/osmocom
 ExecStart=/usr/bin/osmo-pcap-client -c /etc/osmocom/osmo-pcap-client.cfg
 RestartSec=2
 

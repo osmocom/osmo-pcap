@@ -62,6 +62,9 @@ make %{?_smp_mflags}
 %service_del_postun osmo-pcap-client.service osmo-pcap-server.service
 
 %pre
+getent group osmocom >/dev/null || groupadd --system osmocom
+getent passwd osmocom >/dev/null || useradd --system --gid osmocom --home-dir /var/lib/osmocom \
+                                            --shell /sbin/nologin --comment "Open Source Mobile Communications" osmocom
 %service_add_pre osmo-pcap-client.service osmo-pcap-server.service
 
 %post
@@ -75,13 +78,13 @@ make %{?_smp_mflags} check || (find . -name testsuite.log -exec cat {} +)
 %license COPYING
 %doc AUTHORS
 %doc %{_docdir}/%{name}/examples
-%dir %{_sysconfdir}/osmocom
+%dir %attr(2775, root, osmocom) %{_sysconfdir}/osmocom
 %config(noreplace) %{_sysconfdir}/osmocom/osmo-pcap-client.cfg
 %config(noreplace) %{_sysconfdir}/osmocom/osmo-pcap-server.cfg
 %{_bindir}/osmo-pcap-client
 %{_bindir}/osmo-pcap-server
-%{_unitdir}/osmo-pcap-client.service
-%{_unitdir}/osmo-pcap-server.service
+%attr(0660, osmocom, osmocom) %{_unitdir}/osmo-pcap-client.service
+%attr(0660, osmocom, osmocom) %{_unitdir}/osmo-pcap-server.service
 %dir %{_datadir}/%{name}
 %{_datadir}/%{name}/osmo_pcap_clean_old
 

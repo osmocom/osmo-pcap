@@ -8,8 +8,11 @@ Type=simple
 Restart=always
 StateDirectory=osmocom
 WorkingDirectory=%S/osmocom
+User=osmocom
+Group=osmocom
 ExecStart=/usr/bin/osmo-pcap-client -c /etc/osmocom/osmo-pcap-client.cfg
 RestartSec=2
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 
 [Install]
 WantedBy=multi-user.target

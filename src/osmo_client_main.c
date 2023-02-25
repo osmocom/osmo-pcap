@@ -283,7 +283,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	rc = telnet_init_dynif(tall_cli_ctx, NULL, vty_get_bind_addr(), OSMO_VTY_PORT_PCAP_CLIENT);
+	rc = telnet_init_default(tall_cli_ctx, NULL, OSMO_VTY_PORT_PCAP_CLIENT);
 	if (rc < 0) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to bind telnet interface\n");
 		exit(1);

@@ -52,8 +52,6 @@ static int daemonize = 0;
 
 void *tall_srv_ctx;
 struct osmo_pcap_server *pcap_server;
-extern void *tall_msgb_ctx;
-extern void *tall_ctr_ctx;
 
 
 static const struct rate_ctr_desc pcap_peer_ctr_desc[] = {
@@ -235,8 +233,7 @@ static void signal_handler(int signum)
 static void talloc_init_ctx()
 {
 	tall_srv_ctx = talloc_named_const(NULL, 0, "server");
-	tall_msgb_ctx = talloc_named_const(tall_srv_ctx, 0, "msgb");
-	tall_ctr_ctx = talloc_named_const(tall_srv_ctx, 0, "counter");
+	msgb_talloc_ctx_init(tall_srv_ctx, 0);
 }
 
 int main(int argc, char **argv)

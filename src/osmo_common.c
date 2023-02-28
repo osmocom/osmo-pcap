@@ -62,7 +62,7 @@ const struct log_info log_info = {
 	.num_cat = ARRAY_SIZE(default_categories),
 };
 
-const char *osmopcap_copyright = 
+const char *osmopcap_copyright =
 	"Copyright (C) 2011-2017 Holger Freyther and contributors\r\n"
 	"License AGPLv3+: GNU AGPL version 3 or later <http://gnu.org/licenses/agpl-3.0.html>\r\n"
 	"This is free software: you are free to change and redistribute it.\r\n"
@@ -86,5 +86,5 @@ int osmopcap_go_parent(struct vty *vty)
 		break;
 	}
 
-	return vty->node;	
+	return vty->node;
 }

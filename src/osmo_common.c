@@ -88,13 +88,3 @@ int osmopcap_go_parent(struct vty *vty)
 
 	return vty->node;	
 }
-
-int osmopcap_is_config_node(struct vty *vty, int node)
-{
-	switch (node) {
-	case CONFIG_NODE:
-		return 0;
-	default:
-		return 1;
-	}
-}

@@ -89,7 +89,6 @@ static struct vty_app_info vty_info = {
 	.name		= "OsmoPCAPServer",
 	.version	= PACKAGE_VERSION,
 	.go_parent_cb	= osmopcap_go_parent,
-	.is_config_node	= osmopcap_is_config_node,
 };
 
 static void print_usage()

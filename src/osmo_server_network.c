@@ -130,10 +130,10 @@ void osmo_pcap_server_close_trace(struct osmo_pcap_conn *conn)
 static void close_connection(struct osmo_pcap_conn *conn)
 {
 	if (conn->rem_wq.bfd.fd >= 0) {
+		osmo_fd_unregister(&conn->rem_wq.bfd);
 		close(conn->rem_wq.bfd.fd);
 		conn->rem_wq.bfd.fd = -1;
 		osmo_tls_release(&conn->tls_session);
-		osmo_fd_unregister(&conn->rem_wq.bfd);
 	}
 
 	osmo_pcap_server_close_trace(conn);

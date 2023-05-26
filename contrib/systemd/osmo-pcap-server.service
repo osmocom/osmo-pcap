@@ -1,5 +1,7 @@
 [Unit]
 Description=PCAP Server for the PCAP aggregation
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple

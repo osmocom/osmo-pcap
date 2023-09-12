@@ -1,3 +1,28 @@
+osmo-pcap (0.4.2) unstable; urgency=medium
+
+  [ arehbein ]
+  * Transition to use of 'telnet_init_default'
+
+  [ Daniel Willmann ]
+  * osmo_{client,server}_main: Remove tall_ctr_ctx and tall_msgb_ctx
+  * osmo_{client,server}_main: Remove is_config_node in vty_app_info
+  * cosmetic: Remove trailing whitespace
+
+  [ Pau Espin Pedrol ]
+  * server: Call osmo_fd_unregister() before closing and changing bfd->fd
+
+  [ Max ]
+  * CI/CD: drop travis support
+
+  [ Oliver Smith ]
+  * debian: set compat level to 10
+  * systemd: depend on networking-online.target
+
+  [ Vadim Yanitskiy ]
+  * tests: $(BUILT_SOURCES) is not defined
+
+ -- Pau Espin Pedrol <pespin@sysmocom.de>  Tue, 12 Sep 2023 15:50:49 +0200
+
 osmo-pcap (0.4.1) unstable; urgency=medium
 
   [ Max ]

@@ -5,6 +5,7 @@ SUBDIRS = include src contrib doc tests
 BUILT_SOURCES = $(top_srcdir)/.version
 EXTRA_DIST = \
 	     .version \
+	     README.md \
 	     contrib/osmo-pcap.spec.in \
 	     debian \
 	     git-version-gen \

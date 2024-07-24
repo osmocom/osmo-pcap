@@ -7,7 +7,7 @@ Build-Depends:	debhelper (>= 10),
 		autotools-dev,
 		libpcap0.8-dev,
 		pkg-config,
-		libosmocore-dev (>= 1.9.0),
+		libosmocore-dev (>= 1.10.0),
 		libgnutls28-dev,
 		libzmq3-dev (>= 3.2.2)
 Standards-Version: 3.9.1

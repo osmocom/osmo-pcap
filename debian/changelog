@@ -1,3 +1,16 @@
+osmo-pcap (0.5.0) unstable; urgency=medium
+
+  [ Andreas Eversberg ]
+  * Use uniform log format for default config files
+
+  [ Vadim Yanitskiy ]
+  * build: include README.md into the release tarball
+
+  [ Max ]
+  * contrib/systemd: run as osmocom user
+
+ -- Oliver Smith <osmith@sysmocom.de>  Wed, 24 Jul 2024 16:34:17 +0200
+
 osmo-pcap (0.4.2) unstable; urgency=medium
 
   [ arehbein ]

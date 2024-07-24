@@ -29,10 +29,10 @@ BuildRequires:  systemd-rpm-macros
 %endif
 BuildRequires:  pkgconfig
 BuildRequires:  pkgconfig(gnutls)
-BuildRequires:  pkgconfig(libosmocore) >= 1.9.0
-BuildRequires:  pkgconfig(libosmogb) >= 1.9.0
-BuildRequires:  pkgconfig(libosmogsm) >= 1.9.0
-BuildRequires:  pkgconfig(libosmovty) >= 1.9.0
+BuildRequires:  pkgconfig(libosmocore) >= 1.10.0
+BuildRequires:  pkgconfig(libosmogb) >= 1.10.0
+BuildRequires:  pkgconfig(libosmogsm) >= 1.10.0
+BuildRequires:  pkgconfig(libosmovty) >= 1.10.0
 BuildRequires:  pkgconfig(libzmq) >= 3.2.2
 %{?systemd_requires}
 

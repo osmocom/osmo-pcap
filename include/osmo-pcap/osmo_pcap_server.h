@@ -131,6 +131,7 @@ struct osmo_pcap_server {
 	char *base_path;
 	mode_t permission_mask;
 	off_t max_size;
+	bool max_size_enabled;
 	int max_snaplen;
 
 	/* statistics */

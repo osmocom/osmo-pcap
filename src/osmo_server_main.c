@@ -1,6 +1,7 @@
 /*
  * osmo-pcap-server code
  *
+ * (C) 2024 by sysmocom - s.f.m.c. GmbH <info@sysmocom.de>
  * (C) 2011-2016 by Holger Hans Peter Freyther <holger@moiji-mobile.com>
  * (C) 2011 by On-Waves
  * All Rights Reserved
@@ -52,38 +53,6 @@ static int daemonize = 0;
 
 void *tall_srv_ctx;
 struct osmo_pcap_server *pcap_server;
-
-
-static const struct rate_ctr_desc pcap_peer_ctr_desc[] = {
-	[PEER_CTR_CONNECT]		= { "peer:connect",	"Connect of a peer   " },
-	[PEER_CTR_BYTES]		= { "peer:bytes",	"Received bytes      " },
-	[PEER_CTR_PKTS]			= { "peer:pkts",	"Received packets    " },
-	[PEER_CTR_PROTATE]		= { "peer:file_rotated","Capture file rotated" },
-};
-
-static const struct rate_ctr_desc pcap_server_ctr_desc[] = {
-	[SERVER_CTR_CONNECT]		= { "server:connect",	"Connect of a peer   " },
-	[SERVER_CTR_BYTES]		= { "server:bytes",	"Received bytes      " },
-	[SERVER_CTR_PKTS]		= { "server:pkts",	"Received packets    " },
-	[SERVER_CTR_PROTATE]		= { "server:file_rotated", "Capture file rotated" },
-	[SERVER_CTR_NOCLIENT]		= { "server:no_client", "Unknown connected   " },
-};
-
-const struct rate_ctr_group_desc pcap_peer_group_desc = {
-	.group_name_prefix		= NULL,	/* will be dynamically patched */
-	.group_description		= "PCAP peer statistics",
-	.num_ctr			= ARRAY_SIZE(pcap_peer_ctr_desc),
-	.ctr_desc			= pcap_peer_ctr_desc,
-	.class_id			= OSMO_STATS_CLASS_PEER,
-};
-
-static const struct rate_ctr_group_desc pcap_server_group_desc = {
-	.group_name_prefix		= "pcap:server",
-	.group_description		= "PCAP Server global statistics",
-	.num_ctr			= ARRAY_SIZE(pcap_server_ctr_desc),
-	.ctr_desc			= pcap_server_ctr_desc,
-	.class_id			= OSMO_STATS_CLASS_GLOBAL,
-};
 
 static struct vty_app_info vty_info = {
 	.name		= "OsmoPCAPServer",

@@ -10,11 +10,11 @@ Makefile.in
 #configure
 aclocal.m4
 autom4te.cache/
-config.log
-config.status
+config.*
 configure
 depcomp
 install-sh
+ltmain.sh
 missing
 stamp-h1
 compile

@@ -174,7 +174,8 @@ static void restart_pcap(struct osmo_pcap_conn *conn)
 
 	conn->local_fd = creat(conn->curr_filename, conn->server->permission_mask);
 	if (conn->local_fd < 0) {
-		LOGP(DSERVER, LOGL_ERROR, "Failed to file: '%s'\n", conn->curr_filename);
+		LOGP(DSERVER, LOGL_ERROR, "Failed to create file '%s': %s\n",
+		     conn->curr_filename, strerror(errno));
 		return;
 	}
 

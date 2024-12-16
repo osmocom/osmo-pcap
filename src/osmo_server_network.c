@@ -234,7 +234,7 @@ static int write_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 	}
 
 	off_t cur = lseek(conn->local_fd, 0, SEEK_CUR);
-	if (cur > conn->server->max_size) {
+	if (cur + data->len > conn->server->max_size) {
 		LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s\n", conn->name);
 		restart_pcap(conn);
 	} else if (conn->last_write.tm_mday != tm->tm_mday ||

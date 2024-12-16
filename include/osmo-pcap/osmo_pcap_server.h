@@ -48,6 +48,16 @@ struct osmo_pcap_server;
 #define STATE_INITIAL	0
 #define STATE_DATA	1
 
+/*! Rate counter interval */
+enum time_interval {
+	TIME_INTERVAL_SEC,	/*!< second */
+	TIME_INTERVAL_MIN,	/*!< minute */
+	TIME_INTERVAL_HOUR,	/*!< hour */
+	TIME_INTERVAL_DAY,	/*!< day */
+	TIME_INTERVAL_MONTH,	/*!< month */
+	TIME_INTERVAL_YEAR,	/*!< year */
+};
+
 enum {
 	PEER_CTR_CONNECT,
 	PEER_CTR_BYTES,
@@ -133,6 +143,12 @@ struct osmo_pcap_server {
 	off_t max_size;
 	bool max_size_enabled;
 	int max_snaplen;
+
+	struct {
+		bool enabled;
+		enum time_interval intv;
+		unsigned int modulus;
+	} rotate_localtime;
 
 	/* statistics */
 	struct rate_ctr_group *ctrg;

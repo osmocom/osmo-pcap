@@ -1,6 +1,7 @@
 /*
  * osmo-pcap-server code
  *
+ * (C) 2024 by sysmocom - s.f.m.c. GmbH <info@sysmocom.de>
  * (C) 2011-2016 by Holger Hans Peter Freyther <holger@moiji-mobile.com>
  * (C) 2011 by On-Waves
  * All Rights Reserved
@@ -227,11 +228,120 @@ static bool check_restart_pcap_max_size(struct osmo_pcap_conn *conn, const struc
 	return true;
 }
 
+/* Checks if we are in a new record period since last time we wrote to a pcap, to know (return true)
+ * whether a new pcap file needs to be opened. It calculates period based on intv and mod.
+ * NOTE: Kept non-static to be able to validate it with unit tests. */
+bool check_localtime(const struct tm *last_write, const struct tm *tm, enum time_interval intv, unsigned int mod)
+{
+	unsigned long long last_start, current_start;
+
+	switch (intv) {
+	case TIME_INTERVAL_SEC:
+		if (last_write->tm_sec == tm->tm_sec &&
+		    last_write->tm_min == tm->tm_min &&
+		    last_write->tm_hour == tm->tm_hour &&
+		    last_write->tm_mday == tm->tm_mday &&
+		    last_write->tm_mon == tm->tm_mon &&
+		    last_write->tm_year == tm->tm_year)
+			return false;
+		/* If minute/hour/day/month/year changed (passed through second 0), always rotate: */
+		if (last_write->tm_min < tm->tm_min ||
+		    last_write->tm_hour < tm->tm_hour ||
+		    last_write->tm_mday < tm->tm_mday ||
+		    last_write->tm_mon < tm->tm_mon ||
+		    last_write->tm_year < tm->tm_year)
+			return true;
+		/* Same minute/hour/day/month/year, second changed. Check if we are still in same period: */
+		last_start = last_write->tm_sec - (last_write->tm_sec % mod);
+		current_start = tm->tm_sec - (tm->tm_sec % mod);
+		if (current_start <= last_start)
+			return false;
+		return true;
+	case TIME_INTERVAL_MIN:
+		if (last_write->tm_min == tm->tm_min &&
+		    last_write->tm_hour == tm->tm_hour &&
+		    last_write->tm_mday == tm->tm_mday &&
+		    last_write->tm_mon == tm->tm_mon &&
+		    last_write->tm_year == tm->tm_year)
+			return false;
+		/* If hour/day/month/year changed (passed through minute 0), always rotate: */
+		if (last_write->tm_hour < tm->tm_hour ||
+		    last_write->tm_mday < tm->tm_mday ||
+		    last_write->tm_mon < tm->tm_mon ||
+		    last_write->tm_year < tm->tm_year)
+			return true;
+		/* Same hour/day/month/year, minute changed. Check if we are still in same period: */
+		last_start = last_write->tm_min - (last_write->tm_min % mod);
+		current_start = tm->tm_min - (tm->tm_min % mod);
+		if (current_start <= last_start)
+			return false;
+		return true;
+	case TIME_INTERVAL_HOUR:
+		if (last_write->tm_hour == tm->tm_hour &&
+		    last_write->tm_mday == tm->tm_mday &&
+		    last_write->tm_mon == tm->tm_mon &&
+		    last_write->tm_year == tm->tm_year)
+			return false;
+		/* If day/month/year changed (passed through hour 0), always rotate: */
+		if (last_write->tm_mday < tm->tm_mday ||
+		    last_write->tm_mon < tm->tm_mon ||
+		    last_write->tm_year < tm->tm_year)
+			return true;
+		/* Same day/month/year, hour changed. Check if we are still in same period: */
+		last_start = last_write->tm_hour - (last_write->tm_hour % mod);
+		current_start = tm->tm_hour - (tm->tm_hour % mod);
+		if (current_start <= last_start)
+			return false;
+		return true;
+	case TIME_INTERVAL_DAY:
+		if (last_write->tm_mday == tm->tm_mday &&
+		    last_write->tm_mon == tm->tm_mon &&
+		    last_write->tm_year == tm->tm_year)
+			return false;
+		/* If month/year changed (passed through day 1), always rotate: */
+		if (last_write->tm_mon < tm->tm_mon ||
+		    last_write->tm_year < tm->tm_year)
+			return true;
+		/* Same month/year, day changed. Check if we are still in same period: */
+		/* Note: tm_mday is [1, 31], hence the -1 below: */
+		last_start = (last_write->tm_mday - 1) - ((last_write->tm_mday - 1) % mod);
+		current_start = (tm->tm_mday - 1) - ((tm->tm_mday - 1) % mod);
+		if (current_start <= last_start)
+			return false;
+		return true;
+	case TIME_INTERVAL_MONTH:
+		if (last_write->tm_mon == tm->tm_mon &&
+		    last_write->tm_year == tm->tm_year)
+			return false;
+		/* If year changed (passed through month 1), always rotate: */
+		if (last_write->tm_year < tm->tm_year)
+			return true;
+		/* Same year, month changed. Check if we are still in same period: */
+		last_start = last_write->tm_mon - (last_write->tm_mon % mod);
+		current_start = tm->tm_mon - (tm->tm_mon % mod);
+		if (current_start <= last_start)
+			return false;
+		return true;
+	case TIME_INTERVAL_YEAR:
+		/* Year changed. Check if we are still in same period: */
+		last_start = last_write->tm_year - (last_write->tm_year % mod);
+		current_start = tm->tm_year - (tm->tm_year % mod);
+		if (current_start <= last_start)
+			return false;
+		return true;
+	default:
+		OSMO_ASSERT(false);
+	}
+}
+
 static bool check_restart_pcap_localtime(struct osmo_pcap_conn *conn, const struct tm *tm)
 {
-	if (conn->last_write.tm_mday == tm->tm_mday &&
-	    conn->last_write.tm_mon == tm->tm_mon &&
-	    conn->last_write.tm_year == tm->tm_year)
+	if (!pcap_server->rotate_localtime.enabled)
+		return false;
+
+	if (!check_localtime(&conn->last_write, tm,
+			     pcap_server->rotate_localtime.intv,
+			     pcap_server->rotate_localtime.modulus))
 		return false;
 	LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s (localtime)\n", conn->name);
 	restart_pcap(conn);

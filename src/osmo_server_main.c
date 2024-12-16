@@ -253,6 +253,10 @@ int main(int argc, char **argv)
 	pcap_server->max_size = 1073741824; /* 1024^3, 1GB **/
 	pcap_server->max_size_enabled = true;
 	pcap_server->max_snaplen = DEFAULT_SNAPLEN;
+	/* By default rotate daily: */
+	pcap_server->rotate_localtime.enabled = true;
+	pcap_server->rotate_localtime.intv = TIME_INTERVAL_DAY;
+	pcap_server->rotate_localtime.modulus = 1;
 
 	if (vty_read_config_file(config_file, NULL) < 0) {
 		LOGP(DSERVER, LOGL_ERROR,

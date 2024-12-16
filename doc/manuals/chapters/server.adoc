@@ -39,14 +39,12 @@ server
  base-path /var/lib/osmo-pcap-server <1>
  server ip 192.168.11.20 <2>
  server port 54321 <3>
- max-file-size 100000000 <4>
- max-snaplen 100000 <5>
+ max-snaplen 100000 <4>
 ----
 <1> directory to which the pcap files are stored
 <2> IP address to which to bind/listen
 <3> TCP port number to which to bind/listen
-<4> maximum size for pcap files; create a new file once max-file-size is reached
-<5> maximum pcap snapshot length (per packet, in bytes; default: 9000)
+<4> maximum pcap snapshot length (per packet, in bytes; default: 9000)
 
 The received packets are stored to a pcap file below the `base-path` using a filename
 encoding both the client name and the date/time at time of file creation.
@@ -88,3 +86,42 @@ server
 <3> file containing the certificate revocation list
 <4> file containing the server certificate
 <5> file containing the private key for the server certificate
+
+=== PCAP file rotation
+
+`osmo-pcap-server` can be configured to rotate the pcap file it writes to based
+on multiple thresholds. Once such a threshold occurs, usually at the time where
+a packet to be recorded into the pcap file is received.
+`osmo-pcap-server` will decide whether to keep using the previous file or create
+a new file and start writing to it instead.
+
+Current rotation thresholds are based on:
+
+* `max-file-size`: Rotate writing to a new file once the configured maximum file size is reached.
+* `rotate-localtime`: Rotate writing a new file based on local time wall-clock
+configuration
+
+.Example: configuring pcap file rotation
+----
+server
+ ...
+ max-file-size 100000000 <1>
+ rotate-localtime hour <2>
+----
+<1> Rotate to a new file once file reaches 100 MBytes.
+<2> Rotate to a new file once the local time wall clock elapses to next hour (00:XY, 01:XY, 02:XY, ..., 23:XY)
+
+The `rotate-localtime` VTY option also allows triggering the pcap file rotation
+every N units of time, using the `rotate-localtime TIME_UNIT mod N` variant. For
+instance, `rotate-localtime minute mod 21` will trigger rotation of pcap file at
+minutes XY:00, XY:21, XY:42 every hour.
+
+NOTE:: osmo-pcap-server rotates the pcap file when new traffic to be recorded is
+received. That means, for instance following the example above, that if if no
+traffic is received during XY:21 and XY:42, only 2 pcap wills be generated
+instead of 3 during that hour.
+
+WARNING:: If wall clock goes backward (eg. due to drift correction or Daylight
+Saving procedure) and `rotate-localtime` is enabled, osmo-pcap-server may end up
+recreating (and truncating) a previous pcap file if it is generated with the
+same localtime timestamp.

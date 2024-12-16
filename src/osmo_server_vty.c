@@ -41,6 +41,16 @@ static struct cmd_node server_node = {
 	1,
 };
 
+static const struct value_string time_interval_names[] = {
+	{ TIME_INTERVAL_SEC,	"second" },
+	{ TIME_INTERVAL_MIN,	"minute" },
+	{ TIME_INTERVAL_HOUR,	"hour" },
+	{ TIME_INTERVAL_DAY,	"day" },
+	{ TIME_INTERVAL_MONTH,	"month" },
+	{ TIME_INTERVAL_YEAR,	"year" },
+	{ 0, NULL }
+};
+
 static void write_tls(struct vty *vty, struct osmo_pcap_server *pcap_server)
 {
 	if (!pcap_server->tls_on)
@@ -93,6 +103,15 @@ static int config_write_server(struct vty *vty)
 		vty_out(vty, " server ip %s%s", pcap_server->addr, VTY_NEWLINE);
 	if (pcap_server->port > 0)
 		vty_out(vty, " server port %d%s", pcap_server->port, VTY_NEWLINE);
+	if (pcap_server->rotate_localtime.enabled) {
+		const char *name = get_value_string(time_interval_names, pcap_server->rotate_localtime.intv);
+		if (pcap_server->rotate_localtime.modulus == 1)
+			vty_out(vty, " rotate-localtime %s%s", name, VTY_NEWLINE);
+		else
+			vty_out(vty, " rotate-localtime %s mod %u%s", name, pcap_server->rotate_localtime.modulus, VTY_NEWLINE);
+	} else {
+		vty_out(vty, " no rotate-localtime%s", VTY_NEWLINE);
+	}
 	if (pcap_server->max_size_enabled)
 		vty_out(vty, " max-file-size %llu%s", (unsigned long long)pcap_server->max_size, VTY_NEWLINE);
 	else
@@ -192,6 +211,81 @@ DEFUN(cfg_server_port,
 {
 	pcap_server->port = atoi(argv[0]);
 	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_server_no_rotate_localtime,
+      cfg_server_no_rotate_localtime_cmd,
+      "no rotate-localtime",
+      NO_STR "Rotate pcap based on local time clock-wall frequency\n")
+{
+	pcap_server->rotate_localtime.enabled = false;
+	return CMD_SUCCESS;
+}
+
+
+static int apply_rotate_localtime(struct vty *vty, enum time_interval intv, unsigned int modulus)
+{
+	unsigned int max_mod = 0;
+	switch (pcap_server->rotate_localtime.intv) {
+	case TIME_INTERVAL_SEC:
+		max_mod = 60;
+		break;
+	case TIME_INTERVAL_MIN:
+		max_mod = 60;
+		break;
+	case TIME_INTERVAL_HOUR:
+		max_mod = 24;
+		break;
+	case TIME_INTERVAL_DAY:
+		max_mod = 31;
+		break;
+	case TIME_INTERVAL_MONTH:
+		max_mod = 12;
+		break;
+	case TIME_INTERVAL_YEAR:
+		max_mod = 4294967295;
+		break;
+	default:
+		return CMD_WARNING;
+	}
+
+	if (modulus > max_mod) {
+		vty_out(vty, "%%Modulus %u too big for interval %s, maximum value is %u%s",
+			modulus, get_value_string(time_interval_names, intv), max_mod, VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+
+	pcap_server->rotate_localtime.enabled = true;
+	pcap_server->rotate_localtime.intv = intv;
+	pcap_server->rotate_localtime.modulus = modulus;
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_server_rotate_localtime,
+      cfg_server_rotate_localtime_cmd,
+      "rotate-localtime (second|minute|hour|day|month|year)",
+      "Rotate pcap based on local time clock-wall periodicity\n"
+      "Rotate every Second\n"
+      "Rotate every Minute\n"
+      "Rotate every Hour\n"
+      "Rotate every Day\n")
+{
+	return apply_rotate_localtime(vty, get_string_value(time_interval_names, argv[0]), 1);
+}
+
+DEFUN(cfg_server_rotate_localtime_mod_n,
+      cfg_server_rotate_localtime_mod_n_cmd,
+      "rotate-localtime (second|minute|hour|day|month|year) mod <1-4294967295>",
+      "Rotate pcap based on local time clock-wall periodicity\n"
+      "Rotate every Second\n"
+      "Rotate every Minute\n"
+      "Rotate every Hour\n"
+      "Rotate every Day\n"
+      "Rotate every Nth second/minute/hour/day/month/year"
+      "Nth second/minute/hour/day/month/year")
+{
+	unsigned long long modulus = strtoull(argv[1], NULL, 10);
+	return apply_rotate_localtime(vty, get_string_value(time_interval_names, argv[0]), modulus);
 }
 
 DEFUN(cfg_server_max_size,
@@ -575,6 +669,9 @@ void vty_server_init(void)
 	install_element(SERVER_NODE, &cfg_server_file_permission_mask_cmd);
 	install_element(SERVER_NODE, &cfg_server_ip_cmd);
 	install_element(SERVER_NODE, &cfg_server_port_cmd);
+	install_element(SERVER_NODE, &cfg_server_no_rotate_localtime_cmd);
+	install_element(SERVER_NODE, &cfg_server_rotate_localtime_cmd);
+	install_element(SERVER_NODE, &cfg_server_rotate_localtime_mod_n_cmd);
 	install_element(SERVER_NODE, &cfg_server_max_size_cmd);
 	install_element(SERVER_NODE, &cfg_server_no_max_size_cmd);
 	install_element(SERVER_NODE, &cfg_server_max_snaplen_cmd);

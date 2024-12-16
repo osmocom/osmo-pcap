@@ -212,6 +212,30 @@ static int link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 	return 1;
 }
 
+/* Returns true if pcap was re-opened */
+static bool check_restart_pcap_max_size(struct osmo_pcap_conn *conn, const struct osmo_pcap_data *data)
+{
+	off_t cur;
+
+	cur = lseek(conn->local_fd, 0, SEEK_CUR);
+	if (cur + data->len <= conn->server->max_size)
+		return false;
+	LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s (max-size)\n", conn->name);
+	restart_pcap(conn);
+	return true;
+}
+
+static bool check_restart_pcap_localtime(struct osmo_pcap_conn *conn, const struct tm *tm)
+{
+	if (conn->last_write.tm_mday == tm->tm_mday &&
+	    conn->last_write.tm_mon == tm->tm_mon &&
+	    conn->last_write.tm_year == tm->tm_year)
+		return false;
+	LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s (localtime)\n", conn->name);
+	restart_pcap(conn);
+	return true;
+}
+
 /*
  * Check if we are past the limit or on a day change
  */
@@ -233,16 +257,8 @@ static int write_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 		return -1;
 	}
 
-	off_t cur = lseek(conn->local_fd, 0, SEEK_CUR);
-	if (cur + data->len > conn->server->max_size) {
-		LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s\n", conn->name);
-		restart_pcap(conn);
-	} else if (conn->last_write.tm_mday != tm->tm_mday ||
-		   conn->last_write.tm_mon != tm->tm_mon ||
-		   conn->last_write.tm_year != tm->tm_year) {
-		LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s\n", conn->name);
-		restart_pcap(conn);
-	}
+	if (!check_restart_pcap_max_size(conn, data))
+		check_restart_pcap_localtime(conn, tm);
 
 	conn->last_write = *tm;
 	rc = write(conn->local_fd, &data->data[0], data->len);

@@ -169,7 +169,7 @@ static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 		return 0;
 
 	llist_for_each_entry(conn, &client->conns, entry)
-		osmo_client_send_data(conn, &hdr, data);
+		osmo_client_conn_send_data(conn, &hdr, data);
 	return 0;
 }
 
@@ -318,7 +318,7 @@ int osmo_client_capture(struct osmo_pcap_client *client, const char *device)
 	pcap_check_stats_cb(client);
 
 	llist_for_each_entry(conn, &client->conns, entry)
-		osmo_client_send_link(conn);
+		osmo_client_conn_send_link(conn);
 
 	if (client->filter_string) {
 		osmo_install_filter(client);
@@ -348,9 +348,9 @@ struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx)
 	return client;
 }
 
-void osmo_client_free(struct osmo_pcap_client_conn *conn)
+void osmo_client_conn_free(struct osmo_pcap_client_conn *conn)
 {
-	osmo_client_disconnect(conn);
+	osmo_client_conn_disconnect(conn);
 	llist_del(&conn->entry);
 	talloc_free(conn);
 }

@@ -302,7 +302,18 @@ struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx)
 	INIT_LLIST_HEAD(&client->handles);
 	INIT_LLIST_HEAD(&client->conns);
 
+	/* initialize the stats interface */
+	client->ctrg = rate_ctr_group_alloc(pcap_client, &pcap_client_ctr_group_desc, 0);
+	if (!client->ctrg) {
+		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate rate ctr\n");
+		goto ret_free;
+	}
+
 	return client;
+
+ret_free:
+	talloc_free(client);
+	return NULL;
 }
 
 void osmo_client_conn_free(struct osmo_pcap_client_conn *conn)

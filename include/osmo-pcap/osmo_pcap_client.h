@@ -28,13 +28,12 @@
 #include <osmocom/core/linuxlist.h>
 #include <osmocom/core/select.h>
 #include <osmocom/core/timer.h>
+#include <osmocom/core/rate_ctr.h>
 #include <osmocom/core/write_queue.h>
-
-struct rate_ctr_group;
 
 #define WQUEUE_MAXLEN_DEFAULT 1000
 
-enum {
+enum pcap_client_ctr {
 	CLIENT_CTR_CONNECT,
 	CLIENT_CTR_BYTES,
 	CLIENT_CTR_PKTS,
@@ -47,6 +46,7 @@ enum {
 	CLIENT_CTR_P_DROP,
 	CLIENT_CTR_P_IFDROP,
 };
+extern const struct rate_ctr_group_desc pcap_client_ctr_group_desc;
 
 enum osmo_pcap_protocol {
 	PROTOCOL_OSMOPCAP,

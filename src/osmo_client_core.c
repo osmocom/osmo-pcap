@@ -102,6 +102,7 @@ static int check_gprs(const u_char *data, bpf_u_int32 len)
 
 static int can_forward_packet(
 			struct osmo_pcap_client *client,
+			struct osmo_pcap_handle *ph,
 			struct pcap_pkthdr *hdr,
 			const u_char *data)
 {
@@ -116,7 +117,7 @@ static int can_forward_packet(
 	if (!client->gprs_filtering)
 		return 1;
 
-	ll_type = pcap_datalink(client->handle);
+	ll_type = pcap_datalink(ph->handle);
 	switch (ll_type) {
 	case DLT_EN10MB:
 		offset = 14;
@@ -154,18 +155,19 @@ static int can_forward_packet(
 
 static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 {
-	struct osmo_pcap_client *client = fd->data;
+	struct osmo_pcap_handle *ph = fd->data;
+	struct osmo_pcap_client *client = ph->client;
 	struct osmo_pcap_client_conn *conn;
 	struct pcap_pkthdr hdr;
 	const u_char *data;
 
-	data = pcap_next(client->handle, &hdr);
+	data = pcap_next(ph->handle, &hdr);
 	if (!data) {
 		rate_ctr_inc(rate_ctr_group_get_ctr(client->ctrg, CLIENT_CTR_PERR));
 		return -1;
 	}
 
-	if (!can_forward_packet(client, &hdr, data))
+	if (!can_forward_packet(client, ph, &hdr, data))
 		return 0;
 
 	llist_for_each_entry(conn, &client->conns, entry)
@@ -207,138 +209,90 @@ static void add_psbl_wrapped_ctr(struct osmo_pcap_client *client,
 	*old_val = new_val;
 }
 
-static void pcap_check_stats_cb(void *_client)
+static void pcap_check_stats_cb(void *_ph)
 {
 	struct pcap_stat stat;
-	struct osmo_pcap_client *client = _client;
+	struct osmo_pcap_handle *ph = _ph;
+	struct osmo_pcap_client *client = ph->client;
 	int rc;
 
 	/* reschedule */
-	osmo_timer_schedule(&client->pcap_stat_timer, 10, 0);
+	osmo_timer_schedule(&ph->pcap_stat_timer, 10, 0);
 
 	memset(&stat, 0, sizeof(stat));
-	rc = pcap_stats(client->handle, &stat);
+	rc = pcap_stats(ph->handle, &stat);
 	if (rc != 0) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to query pcap stats: %s\n",
-			pcap_geterr(client->handle));
+			pcap_geterr(ph->handle));
 		rate_ctr_inc(rate_ctr_group_get_ctr(client->ctrg, CLIENT_CTR_PERR));
 		return;
 	}
 
-	add_psbl_wrapped_ctr(client, &client->last_ps_recv, stat.ps_recv, CLIENT_CTR_P_RECV);
-	add_psbl_wrapped_ctr(client, &client->last_ps_drop, stat.ps_drop, CLIENT_CTR_P_DROP);
-	add_psbl_wrapped_ctr(client, &client->last_ps_ifdrop, stat.ps_ifdrop, CLIENT_CTR_P_IFDROP);
+	add_psbl_wrapped_ctr(client, &ph->last_ps_recv, stat.ps_recv, CLIENT_CTR_P_RECV);
+	add_psbl_wrapped_ctr(client, &ph->last_ps_drop, stat.ps_drop, CLIENT_CTR_P_DROP);
+	add_psbl_wrapped_ctr(client, &ph->last_ps_ifdrop, stat.ps_ifdrop, CLIENT_CTR_P_IFDROP);
 }
 
-static int osmo_install_filter(struct osmo_pcap_client *client)
+static int osmo_pcap_handle_install_filter(struct osmo_pcap_handle *ph)
 {
 	int rc;
-	pcap_freecode(&client->bpf);
+	pcap_freecode(&ph->bpf);
 
-	if (!client->handle) {
+	if (!ph->handle) {
 		LOGP(DCLIENT, LOGL_NOTICE,
 		    "Filter will only be applied later.\n");
-		return 1;
+		return 0;
 	}
 
-	rc = pcap_compile(client->handle, &client->bpf,
-			  client->filter_string, 1, PCAP_NETMASK_UNKNOWN);
+	rc = pcap_compile(ph->handle, &ph->bpf,
+			  ph->client->filter_string, 1, PCAP_NETMASK_UNKNOWN);
 	if (rc != 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
 		     "Failed to compile the filter: %s\n",
-		     pcap_geterr(client->handle));
+		     pcap_geterr(ph->handle));
 		return rc;
 	}
 
-	rc = pcap_setfilter(client->handle, &client->bpf);
+	rc = pcap_setfilter(ph->handle, &ph->bpf);
 	if (rc != 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
 		     "Failed to set the filter on the interface: %s\n",
-		     pcap_geterr(client->handle));
-		pcap_freecode(&client->bpf);
+		     pcap_geterr(ph->handle));
+		pcap_freecode(&ph->bpf);
 		return rc;
 	}
 
 	return rc;
 }
 
-static void free_all(struct osmo_pcap_client *client)
+int osmo_client_start_capture(struct osmo_pcap_client *client)
 {
-	if (!client->handle)
-		return;
-
-	pcap_freecode(&client->bpf);
-
-	if (client->fd.fd >= 0) {
-		osmo_fd_unregister(&client->fd);
-		client->fd.fd = -1;
-	}
-
-	pcap_close(client->handle);
-	osmo_timer_del(&client->pcap_stat_timer);
-	client->handle = NULL;
-}
-
-int osmo_client_capture(struct osmo_pcap_client *client, const char *device)
-{
+	struct osmo_pcap_handle *ph;
 	struct osmo_pcap_client_conn *conn;
-	int fd;
+	int rc;
 
-	talloc_free(client->device);
-	free_all(client);
-
-	client->device = talloc_strdup(client, device);
-	if (!client->device) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to copy string.\n");
-		return 1;
+	llist_for_each_entry(ph, &client->handles, entry) {
+		rc = osmo_pcap_handle_start_capture(ph);
+		if (rc < 0)
+			return rc;
 	}
-
-	LOGP(DCLIENT, LOGL_INFO, "Opening device %s for capture with snaplen %zu\n",
-	     client->device, (size_t) client->snaplen);
-	client->handle = pcap_open_live(client->device, client->snaplen, 0,
-					1000, client->errbuf);
-	if (!client->handle) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "Failed to open the device: %s\n", client->errbuf);
-		return 2;
-	}
-
-	fd = pcap_fileno(client->handle);
-	if (fd == -1) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "No file descriptor provided.\n");
-		free_all(client);
-		return 3;
-	}
-
-	osmo_fd_setup(&client->fd, fd, OSMO_FD_READ, pcap_read_cb, client, 0);
-	if (osmo_fd_register(&client->fd) != 0) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "Failed to register the fd.\n");
-		client->fd.fd = -1;
-		free_all(client);
-		return 4;
-	}
-
-	client->pcap_stat_timer.data = client;
-	client->pcap_stat_timer.cb = pcap_check_stats_cb;
-	pcap_check_stats_cb(client);
 
 	llist_for_each_entry(conn, &client->conns, entry)
 		osmo_client_conn_send_link(conn);
-
-	if (client->filter_string) {
-		osmo_install_filter(client);
-	}
-
 	return 0;
 }
 
 int osmo_client_filter(struct osmo_pcap_client *client, const char *filter)
 {
+	struct osmo_pcap_handle *ph;
+	int rc = 0;
 	talloc_free(client->filter_string);
 	client->filter_string = talloc_strdup(client, filter);
-	return osmo_install_filter(client);
+
+	llist_for_each_entry(ph, &client->handles, entry)
+		rc |= osmo_pcap_handle_install_filter(ph);
+
+	return rc;
 }
 
 struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx)
@@ -348,8 +302,8 @@ struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx)
 	if (!client)
 		return NULL;
 
-	client->fd.fd = -1;
 	client->snaplen = DEFAULT_SNAPLEN;
+	INIT_LLIST_HEAD(&client->handles);
 	INIT_LLIST_HEAD(&client->conns);
 
 	return client;
@@ -406,4 +360,90 @@ struct osmo_pcap_client_conn *osmo_client_find_or_create_conn(
 	if (!conn)
 		conn = osmo_client_conn_alloc(client, name);
 	return conn;
+}
+
+struct osmo_pcap_handle *osmo_client_find_handle(struct osmo_pcap_client *client, const char *devname)
+{
+	struct osmo_pcap_handle *ph;
+
+	llist_for_each_entry(ph, &client->handles, entry)
+		if (strcmp(ph->devname, devname) == 0)
+			return ph;
+	return NULL;
+}
+
+struct osmo_pcap_handle *osmo_pcap_handle_alloc(struct osmo_pcap_client *client, const char *devname)
+{
+	struct osmo_pcap_handle *ph;
+
+	ph = talloc_zero(client, struct osmo_pcap_handle);
+	OSMO_ASSERT(ph);
+
+	ph->devname = talloc_strdup(ph, devname);
+	OSMO_ASSERT(ph->devname);
+
+	ph->client = client;
+	ph->fd.fd = -1;
+
+	llist_add_tail(&ph->entry, &client->handles);
+	return ph;
+}
+
+void osmo_pcap_handle_free(struct osmo_pcap_handle *ph)
+{
+	if (!ph)
+		return;
+	llist_del(&ph->entry);
+
+	osmo_timer_del(&ph->pcap_stat_timer);
+
+	pcap_freecode(&ph->bpf);
+
+	if (ph->fd.fd >= 0) {
+		osmo_fd_unregister(&ph->fd);
+		ph->fd.fd = -1;
+	}
+
+	if (ph->handle) {
+		pcap_close(ph->handle);
+		ph->handle = NULL;
+	}
+
+	talloc_free(ph);
+}
+
+int osmo_pcap_handle_start_capture(struct osmo_pcap_handle *ph)
+{
+	struct osmo_pcap_client *client = ph->client;
+	int fd;
+	char errbuf[PCAP_ERRBUF_SIZE];
+
+	LOGP(DCLIENT, LOGL_INFO, "Opening device %s for capture with snaplen %zu\n",
+	     ph->devname, (size_t) client->snaplen);
+	ph->handle = pcap_open_live(ph->devname, client->snaplen, 0, 1000, errbuf);
+	if (!ph->handle) {
+		LOGP(DCLIENT, LOGL_ERROR,
+		     "Failed to open the device: %s\n", errbuf);
+		return -2;
+	}
+
+	fd = pcap_fileno(ph->handle);
+	if (fd == -1) {
+		LOGP(DCLIENT, LOGL_ERROR, "No file descriptor provided.\n");
+		return -3;
+	}
+
+	osmo_fd_setup(&ph->fd, fd, OSMO_FD_READ, pcap_read_cb, ph, 0);
+	if (osmo_fd_register(&ph->fd) != 0) {
+		LOGP(DCLIENT, LOGL_ERROR,
+		     "Failed to register the fd.\n");
+		return -4;
+	}
+
+	osmo_timer_setup(&ph->pcap_stat_timer, pcap_check_stats_cb, ph);
+	pcap_check_stats_cb(ph);
+
+	if (client->filter_string)
+		osmo_pcap_handle_install_filter(ph);
+	return 0;
 }

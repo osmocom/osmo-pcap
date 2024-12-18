@@ -61,7 +61,7 @@ static void write_data(struct osmo_pcap_client_conn *conn, struct msgb *msg)
 	if (osmo_wqueue_enqueue_quiet(&conn->wqueue, msg) != 0) {
 		LOGCONN(conn, LOGL_ERROR, "Failed to enqueue msg (capacity: %u/%u)\n",
 			conn->wqueue.current_length, conn->wqueue.max_length);
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_QERR));
+		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_QERR);
 		msgb_free(msg);
 		return;
 	}
@@ -91,7 +91,7 @@ static int write_cb(struct osmo_fd *fd, struct msgb *msg)
 	if (rc < 0) {
 		struct osmo_pcap_client_conn *conn = fd->data;
 		LOGCONN(conn, LOGL_ERROR, "Lost connection on write\n");
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_WERR));
+		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_WERR);
 		lost_connection(conn);
 		return -1;
 	}
@@ -172,13 +172,13 @@ void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
 	if (in_hdr->len > in_hdr->caplen) {
 		LOGCONN(conn, LOGL_ERROR, "Recording truncated packet, len %zu > snaplen %zu\n",
 			(size_t) in_hdr->len, (size_t) in_hdr->caplen);
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_2BIG));
+		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_2BIG);
 	}
 
 	msg = msgb_alloc(in_hdr->caplen + sizeof(*om_hdr) + sizeof(*hdr), "data-data");
 	if (!msg) {
 		LOGCONN(conn, LOGL_ERROR, "Failed to allocate\n");
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_NOMEM));
+		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_NOMEM);
 		return;
 	}
 
@@ -198,8 +198,8 @@ void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
 		memcpy(msg->l3h, data, in_hdr->caplen);
 
 		om_hdr->len = htons(msgb_l2len(msg));
-		rate_ctr_add(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_BYTES), hdr->caplen);
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_PKTS));
+		rate_ctr_add2(conn->client->ctrg, CLIENT_CTR_BYTES, hdr->caplen);
+		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_PKTS);
 		break;
 	case PROTOCOL_IPIP:
 		/* TODO: support capturing from multiple interfaces here: */
@@ -310,7 +310,7 @@ void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn)
 	osmo_fd_setup(&conn->wqueue.bfd, rc, when, conn_cb, conn, 0);
 	osmo_fd_register(&conn->wqueue.bfd);
 
-	rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_CONNECT));
+	rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_CONNECT);
 }
 
 void osmo_client_conn_reconnect(struct osmo_pcap_client_conn *conn)

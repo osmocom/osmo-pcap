@@ -59,8 +59,8 @@ static void lost_connection(struct osmo_pcap_client_conn *conn)
 static void write_data(struct osmo_pcap_client_conn *conn, struct msgb *msg)
 {
 	if (osmo_wqueue_enqueue_quiet(&conn->wqueue, msg) != 0) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to enqueue conn=%s (capacity: %u/%u)\n",
-			 conn->name, conn->wqueue.current_length, conn->wqueue.max_length);
+		LOGCONN(conn, LOGL_ERROR, "Failed to enqueue msg (capacity: %u/%u)\n",
+			conn->wqueue.current_length, conn->wqueue.max_length);
 		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_QERR));
 		msgb_free(msg);
 		return;
@@ -75,8 +75,7 @@ static int read_cb(struct osmo_fd *fd)
 	rc = read(fd->fd, buf, sizeof(buf));
 	if (rc <= 0) {
 		struct osmo_pcap_client_conn *conn = fd->data;
-		LOGP(DCLIENT, LOGL_ERROR, "Lost connection on read conn=%s\n",
-			conn->name);
+		LOGCONN(conn, LOGL_ERROR, "Lost connection on read\n");
 		lost_connection(conn);
 		return -1;
 	}
@@ -91,8 +90,7 @@ static int write_cb(struct osmo_fd *fd, struct msgb *msg)
 	rc = write(fd->fd, msg->data, msg->len);
 	if (rc < 0) {
 		struct osmo_pcap_client_conn *conn = fd->data;
-		LOGP(DCLIENT, LOGL_ERROR, "Lost connection on write to %s %s:%d.\n",
-			conn->name, conn->srv_ip, conn->srv_port);
+		LOGCONN(conn, LOGL_ERROR, "Lost connection on write\n");
 		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_WERR));
 		lost_connection(conn);
 		return -1;
@@ -172,15 +170,14 @@ void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
 	struct osmo_pcap_handle *ph;
 
 	if (in_hdr->len > in_hdr->caplen) {
-		LOGP(DCLIENT, LOGL_ERROR,
-			"Recording truncated packet, len %zu > snaplen %zu\n",
+		LOGCONN(conn, LOGL_ERROR, "Recording truncated packet, len %zu > snaplen %zu\n",
 			(size_t) in_hdr->len, (size_t) in_hdr->caplen);
 		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_2BIG));
 	}
 
 	msg = msgb_alloc(in_hdr->caplen + sizeof(*om_hdr) + sizeof(*hdr), "data-data");
 	if (!msg) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate.\n");
+		LOGCONN(conn, LOGL_ERROR, "Failed to allocate\n");
 		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_NOMEM));
 		return;
 	}
@@ -245,8 +242,7 @@ void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 	/* TODO: support capturing from multiple interfaces here: */
 	ph = llist_first_entry_or_null(&conn->client->handles, struct osmo_pcap_handle, entry);
 	if (!ph || !ph->handle) {
-		LOGP(DCLIENT, LOGL_ERROR,
-			"No pcap_handle not sending link info to conn=%s\n", conn->name);
+		LOGCONN(conn, LOGL_ERROR, "No pcap_handle not sending link info\n");
 		return;
 	}
 
@@ -307,9 +303,7 @@ void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn)
 	rc = osmo_sock_init2(AF_INET, sock_type, sock_proto, conn->source_ip, 0, conn->srv_ip, srv_port,
 			     OSMO_SOCK_F_BIND | OSMO_SOCK_F_CONNECT | OSMO_SOCK_F_NONBLOCK);
 	if (rc < 0) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "Failed to connect conn=%s to %s:%d\n",
-		     conn->name, conn->srv_ip, conn->srv_port);
+		LOGCONN(conn, LOGL_ERROR, "Failed to connect\n");
 		lost_connection(conn);
 		return;
 	}

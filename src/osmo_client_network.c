@@ -169,6 +169,7 @@ void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
 	struct osmo_pcap_pkthdr *hdr;
 	struct msgb *msg;
 	int offset, ip_len;
+	struct osmo_pcap_handle *ph;
 
 	if (in_hdr->len > in_hdr->caplen) {
 		LOGP(DCLIENT, LOGL_ERROR,
@@ -204,7 +205,13 @@ void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
 		rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_PKTS));
 		break;
 	case PROTOCOL_IPIP:
-		offset = get_iphdr_offset(pcap_datalink(conn->client->handle));
+		/* TODO: support capturing from multiple interfaces here: */
+		ph = llist_first_entry_or_null(&conn->client->handles, struct osmo_pcap_handle, entry);
+		if (!ph) {
+			msgb_free(msg);
+			return;
+		}
+		offset = get_iphdr_offset(pcap_datalink(ph->handle));
 		if (offset < 0) {
 			msgb_free(msg);
 			return;
@@ -226,6 +233,7 @@ void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
 
 void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 {
+	struct osmo_pcap_handle *ph;
 	struct pcap_file_header *hdr;
 	struct osmo_pcap_data *om_hdr;
 	struct msgb *msg;
@@ -234,7 +242,9 @@ void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 	if (conn->protocol == PROTOCOL_IPIP)
 		return;
 
-	if (!conn->client->handle) {
+	/* TODO: support capturing from multiple interfaces here: */
+	ph = llist_first_entry_or_null(&conn->client->handles, struct osmo_pcap_handle, entry);
+	if (!ph || !ph->handle) {
 		LOGP(DCLIENT, LOGL_ERROR,
 			"No pcap_handle not sending link info to conn=%s\n", conn->name);
 		return;
@@ -258,7 +268,7 @@ void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 	hdr->thiszone = 0;
 	hdr->sigfigs = 0;
 	hdr->snaplen = conn->client->snaplen;
-	hdr->linktype = pcap_datalink(conn->client->handle);
+	hdr->linktype = pcap_datalink(ph->handle);
 
 	write_data(conn, msg);
 }

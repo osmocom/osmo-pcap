@@ -126,11 +126,14 @@ static int config_write_server(struct vty *vty)
 
 static int config_write_client(struct vty *vty)
 {
+	struct osmo_pcap_handle *ph;
+
 	vty_out(vty, "client%s", VTY_NEWLINE);
 
-	if (pcap_client->device)
+	llist_for_each_entry(ph, &pcap_client->handles, entry) {
 		vty_out(vty, " pcap device %s%s",
-			pcap_client->device, VTY_NEWLINE);
+			ph->devname, VTY_NEWLINE);
+	}
 	if (pcap_client->snaplen != DEFAULT_SNAPLEN)
 		vty_out(vty, " pcap snaplen %d%s",
 			pcap_client->snaplen, VTY_NEWLINE);
@@ -147,12 +150,34 @@ static int config_write_client(struct vty *vty)
 	return CMD_SUCCESS;
 }
 
+DEFUN(cfg_client_no_device,
+      cfg_client_no_device_cmd,
+      "no pcap device NAME",
+      NO_STR PCAP_STRING "the device to filter\n" "device name\n")
+{
+	struct osmo_pcap_handle *ph = osmo_client_find_handle(pcap_client, argv[0]);
+	if (!ph) {
+		vty_out(vty, "%% Device %s not found!%s", argv[0], VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	osmo_pcap_handle_free(ph);
+	return CMD_SUCCESS;
+}
+
 DEFUN(cfg_client_device,
       cfg_client_device_cmd,
       "pcap device NAME",
       PCAP_STRING "the device to filter\n" "device name\n")
 {
-	osmo_client_capture(pcap_client, argv[0]);
+	struct osmo_pcap_handle *ph = osmo_client_find_handle(pcap_client, argv[0]);
+	if (!ph) {
+		/* Only allow max one for now:*/
+		if (llist_count(&pcap_client->handles) > 0) {
+			vty_out(vty, "Only one 'pcap device' allowed! Remove the old one with 'no pcap device' first!%s", VTY_NEWLINE);
+			return CMD_WARNING;
+		}
+		osmo_pcap_handle_alloc(pcap_client, argv[0]);
+	}
 	return CMD_SUCCESS;
 }
 
@@ -161,10 +186,6 @@ DEFUN(cfg_client_snaplen,
 	      "pcap snaplen <1-262144>", /* MAXIMUM_SNAPLEN */
       PCAP_STRING "snapshot length\n" "Bytes\n")
 {
-	if (pcap_client->handle) {
-		vty_out(vty, "'pcap snaplen' must be set before 'pcap device' to take effect!%s", VTY_NEWLINE);
-		return CMD_WARNING;
-	}
 	pcap_client->snaplen = atoi(argv[0]);
 	return CMD_SUCCESS;
 }
@@ -544,6 +565,7 @@ int vty_client_init(void)
 
 	install_node(&server_node, config_write_server);
 
+	install_element(CLIENT_NODE, &cfg_client_no_device_cmd);
 	install_element(CLIENT_NODE, &cfg_client_device_cmd);
 	install_element(CLIENT_NODE, &cfg_client_snaplen_cmd);
 	install_element(CLIENT_NODE, &cfg_client_filter_cmd);

@@ -283,6 +283,11 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	rc = osmo_client_start_capture(pcap_client);
+	if (rc < 0) {
+		LOGP(DCLIENT, LOGL_ERROR, "Failed to start capturing on interfaces\n");
+		exit(1);
+	}
 
 	/* attempt to connect to the remote */
 	if (pcap_client->conn->srv_ip && pcap_client->conn->srv_port > 0)

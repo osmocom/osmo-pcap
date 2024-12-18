@@ -82,22 +82,26 @@ struct osmo_pcap_client_conn {
 	struct osmo_pcap_client *client;
 };
 
-struct osmo_pcap_client {
-	char *device;
+struct osmo_pcap_handle {
+	struct llist_head entry; /* item in (struct osmo_pcap_client)->handles */
+	struct osmo_pcap_client *client; /* back pointer */
+	char *devname;
 	pcap_t *handle;
-	char errbuf[PCAP_ERRBUF_SIZE];
-
+	struct osmo_fd fd;
 	u_int last_ps_recv;
 	u_int last_ps_drop;
 	u_int last_ps_ifdrop;
 	struct osmo_timer_list pcap_stat_timer;
-
 	struct bpf_program bpf;
-	char   *filter_string;
+};
+
+struct osmo_pcap_client {
+	struct llist_head handles; /* list of struct osmo_pcap_handle */
+
+	char *filter_string;
 	int filter_itself;
 	int gprs_filtering;
 	int snaplen;
-	struct osmo_fd fd;
 
 	struct osmo_pcap_client_conn *conn;
 	struct llist_head conns;
@@ -111,11 +115,13 @@ extern struct osmo_pcap_client *pcap_client;
 struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx);
 int vty_client_init(void);
 
-int osmo_client_capture(struct osmo_pcap_client *client, const char *device);
+int osmo_client_start_capture(struct osmo_pcap_client *client);
 int osmo_client_filter(struct osmo_pcap_client *client, const char *filter);
 
 struct osmo_pcap_client_conn *osmo_client_find_or_create_conn(struct osmo_pcap_client *, const char *name);
 struct osmo_pcap_client_conn *osmo_client_find_conn(struct osmo_pcap_client *, const char *name);
+
+struct osmo_pcap_handle *osmo_client_find_handle(struct osmo_pcap_client *client, const char *devname);
 
 struct osmo_pcap_client_conn *osmo_client_conn_alloc(struct osmo_pcap_client *client, const char *name);
 void osmo_client_conn_free(struct osmo_pcap_client_conn *conn);
@@ -125,3 +131,8 @@ void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_disconnect(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_reconnect(struct osmo_pcap_client_conn *conn);
+
+
+struct osmo_pcap_handle *osmo_pcap_handle_alloc(struct osmo_pcap_client *client, const char *devname);
+void osmo_pcap_handle_free(struct osmo_pcap_handle *ph);
+int osmo_pcap_handle_start_capture(struct osmo_pcap_handle *ph);

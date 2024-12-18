@@ -230,7 +230,7 @@ DEFUN(cfg_enable_tls,
 
 	if (!conn->tls_on) {
 		if (conn->wqueue.bfd.fd >= 0)
-			osmo_client_reconnect(conn);
+			osmo_client_conn_reconnect(conn);
 	}
 
 	conn->tls_on = true;
@@ -245,7 +245,7 @@ DEFUN(cfg_disable_tls,
 	struct osmo_pcap_client_conn *conn = get_conn(vty);
 
 	if (conn->tls_on)
-		osmo_client_reconnect(conn);
+		osmo_client_conn_reconnect(conn);
 
 	conn->tls_on = false;
 	return CMD_SUCCESS;
@@ -471,7 +471,7 @@ DEFUN(cfg_no_pcap_store,
 		return CMD_WARNING;
 	}
 
-	osmo_client_free(conn);
+	osmo_client_conn_free(conn);
 	return CMD_SUCCESS;
 }
 
@@ -482,7 +482,7 @@ DEFUN(cfg_client_connect,
 {
 	struct osmo_pcap_client_conn *conn = get_conn(vty);
 
-	osmo_client_connect(conn);
+	osmo_client_conn_connect(conn);
 	return CMD_SUCCESS;
 }
 
@@ -493,7 +493,7 @@ DEFUN(cfg_client_disconnect,
 {
 	struct osmo_pcap_client_conn *conn = get_conn(vty);
 
-	osmo_client_disconnect(conn);
+	osmo_client_conn_disconnect(conn);
 	return CMD_SUCCESS;
 }
 

@@ -286,7 +286,7 @@ int main(int argc, char **argv)
 
 	/* attempt to connect to the remote */
 	if (pcap_client->conn->srv_ip && pcap_client->conn->srv_port > 0)
-		osmo_client_connect(pcap_client->conn);
+		osmo_client_conn_connect(pcap_client->conn);
 
 	if (daemonize) {
 		rc = osmo_daemonize();

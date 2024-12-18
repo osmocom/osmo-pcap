@@ -42,16 +42,16 @@
 #include <string.h>
 #include <unistd.h>
 
-static void _osmo_client_connect(void *_data)
+static void _osmo_client_conn_connect(void *_data)
 {
-	osmo_client_connect((struct osmo_pcap_client_conn *) _data);
+	osmo_client_conn_connect((struct osmo_pcap_client_conn *) _data);
 }
 
 static void lost_connection(struct osmo_pcap_client_conn *conn)
 {
-	osmo_client_disconnect(conn);
+	osmo_client_conn_disconnect(conn);
 
-	conn->timer.cb = _osmo_client_connect;
+	conn->timer.cb = _osmo_client_conn_connect;
 	conn->timer.data = conn;
 	osmo_timer_schedule(&conn->timer, 2, 0);
 }
@@ -107,7 +107,7 @@ static void handshake_done_cb(struct osmo_tls_session *session)
 
 	conn = container_of(session, struct osmo_pcap_client_conn, tls_session);
 	osmo_wqueue_clear(&conn->wqueue);
-	osmo_client_send_link(conn);
+	osmo_client_conn_send_link(conn);
 }
 
 static void tls_error_cb(struct osmo_tls_session *session)
@@ -141,7 +141,7 @@ int conn_cb(struct osmo_fd *fd, unsigned int what)
 			conn->wqueue.bfd.cb = osmo_wqueue_bfd_cb;
 			conn->wqueue.bfd.data = conn;
 			osmo_wqueue_clear(&conn->wqueue);
-			osmo_client_send_link(conn);
+			osmo_client_conn_send_link(conn);
 		}
 	}
 
@@ -162,8 +162,8 @@ static int get_iphdr_offset(int dlt)
 	}
 }
 
-void osmo_client_send_data(struct osmo_pcap_client_conn *conn,
-			   struct pcap_pkthdr *in_hdr, const uint8_t *data)
+void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
+				struct pcap_pkthdr *in_hdr, const uint8_t *data)
 {
 	struct osmo_pcap_data *om_hdr;
 	struct osmo_pcap_pkthdr *hdr;
@@ -224,7 +224,7 @@ void osmo_client_send_data(struct osmo_pcap_client_conn *conn,
 	write_data(conn, msg);
 }
 
-void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
+void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 {
 	struct pcap_file_header *hdr;
 	struct osmo_pcap_data *om_hdr;
@@ -263,14 +263,14 @@ void osmo_client_send_link(struct osmo_pcap_client_conn *conn)
 	write_data(conn, msg);
 }
 
-void osmo_client_connect(struct osmo_pcap_client_conn *conn)
+void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn)
 {
 	int rc;
 	uint16_t srv_port;
 	int sock_type, sock_proto;
 	unsigned int when;
 
-	osmo_client_disconnect(conn);
+	osmo_client_conn_disconnect(conn);
 
 	conn->wqueue.read_cb = read_cb;
 	conn->wqueue.write_cb = write_cb;
@@ -309,12 +309,12 @@ void osmo_client_connect(struct osmo_pcap_client_conn *conn)
 	rate_ctr_inc(rate_ctr_group_get_ctr(conn->client->ctrg, CLIENT_CTR_CONNECT));
 }
 
-void osmo_client_reconnect(struct osmo_pcap_client_conn *conn)
+void osmo_client_conn_reconnect(struct osmo_pcap_client_conn *conn)
 {
 	lost_connection(conn);
 }
 
-void osmo_client_disconnect(struct osmo_pcap_client_conn *conn)
+void osmo_client_conn_disconnect(struct osmo_pcap_client_conn *conn)
 {
 	if (conn->wqueue.bfd.fd >= 0) {
 		osmo_tls_release(&conn->tls_session);

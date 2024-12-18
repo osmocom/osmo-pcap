@@ -122,6 +122,6 @@ traffic is received during XY:21 and XY:42, only 2 pcap wills be generated
 instead of 3 during that hour.
 
 WARNING:: If wall clock goes backward (eg. due to drift correction or Daylight
-Saving procedure) and `rotate-localtime` is enabled, osmo-pcap-server may end up
-recreating (and truncating) a previous pcap file if it is generated with the
-same localtime timestamp.
+Saving procedure), osmo-pcap-server may end up recreating (and truncating) a
+previous pcap file if it is generated with the same localtime timestamp, for
+instance because connection from osmo-pcap-client was re-established.

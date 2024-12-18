@@ -351,8 +351,11 @@ struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx)
 	client = talloc_zero(tall_ctx, struct osmo_pcap_client);
 	if (!client)
 		return NULL;
+
 	client->fd.fd = -1;
 	client->snaplen = DEFAULT_SNAPLEN;
+	INIT_LLIST_HEAD(&client->conns);
+
 	return client;
 }
 

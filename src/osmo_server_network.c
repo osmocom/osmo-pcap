@@ -146,26 +146,42 @@ void osmo_pcap_server_close_conn(struct osmo_pcap_conn *conn)
 	return close_connection(conn);
 }
 
+/* Update conn->last_write if needed. This field is used to keep the last time
+ * period where we wrote to the pcap file. Once a new write period (based on
+ * rotation VTY config) is detected, the pcap file we write to is rotated. */
+static void update_last_write(struct osmo_pcap_conn *conn, time_t now)
+{
+	time_t last = mktime(&conn->last_write);
+
+	/* Skip time udpates if wall clock went backwards (ie. due to drift
+	 * correction or DST). As a result, time rotation checks will skip
+	 * opening a new pcap file with an older timestamp, and instead keep
+	 * using the current one. */
+	if (now > last)
+		localtime_r(&now, &conn->last_write);
+}
+
 static void restart_pcap(struct osmo_pcap_conn *conn)
 {
 	time_t now = time(NULL);
-	struct tm *tm = localtime(&now);
+	struct tm tm;
 	int rc;
 
 	osmo_pcap_server_close_trace(conn);
 
 	/* omit any storing/creation of the file */
 	if (conn->no_store) {
-		conn->last_write = *tm;
+		update_last_write(conn, now);
 		talloc_free(conn->curr_filename);
 		conn->curr_filename = NULL;
 		return;
 	}
 
+	localtime_r(&now, &tm);
 	conn->curr_filename = talloc_asprintf(conn, "%s/trace-%s-%d%.2d%.2d_%.2d%.2d%.2d.pcap",
 				   conn->server->base_path, conn->name,
-				   tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-				   tm->tm_hour, tm->tm_min, tm->tm_sec);
+				   tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+				   tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 	if (!conn->curr_filename) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to assemble filename for %s.\n", conn->name);
@@ -187,7 +203,7 @@ static void restart_pcap(struct osmo_pcap_conn *conn)
 		return;
 	}
 
-	conn->last_write = *tm;
+	update_last_write(conn, now);
 }
 
 static int link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
@@ -335,12 +351,14 @@ bool check_localtime(const struct tm *last_write, const struct tm *tm, enum time
 	}
 }
 
-static bool check_restart_pcap_localtime(struct osmo_pcap_conn *conn, const struct tm *tm)
+static bool check_restart_pcap_localtime(struct osmo_pcap_conn *conn, time_t now)
 {
+	struct tm tm;
 	if (!pcap_server->rotate_localtime.enabled)
 		return false;
 
-	if (!check_localtime(&conn->last_write, tm,
+	localtime_r(&now, &tm);
+	if (!check_localtime(&conn->last_write, &tm,
 			     pcap_server->rotate_localtime.intv,
 			     pcap_server->rotate_localtime.modulus))
 		return false;
@@ -355,13 +373,12 @@ static bool check_restart_pcap_localtime(struct osmo_pcap_conn *conn, const stru
 static int write_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 {
 	time_t now = time(NULL);
-	struct tm *tm = localtime(&now);
 	int rc;
 
 	client_data(conn, data);
 
 	if (conn->no_store) {
-		conn->last_write = *tm;
+		update_last_write(conn, now);
 		return 1;
 	}
 
@@ -371,9 +388,9 @@ static int write_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 	}
 
 	if (!check_restart_pcap_max_size(conn, data))
-		check_restart_pcap_localtime(conn, tm);
+		check_restart_pcap_localtime(conn, now);
 
-	conn->last_write = *tm;
+	update_last_write(conn, now);
 	rc = write(conn->local_fd, &data->data[0], data->len);
 	if (rc != data->len) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to write for %s\n", conn->name);

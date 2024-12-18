@@ -261,16 +261,15 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	/* initialize the queue */
-	osmo_client_conn_init(&pcap_client->conn, pcap_client);
-	pcap_client->conn.name = "default";
-
 	/* initialize the stats interface */
 	pcap_client->ctrg = rate_ctr_group_alloc(pcap_client, &pcap_client_ctr_group_desc, 0);
 	if (!pcap_client->ctrg) {
 		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate rate ctr\n");
 		exit(1);
 	}
+
+	/* Default conn, always present. */
+	pcap_client->conn = osmo_client_conn_alloc(pcap_client, "default");
 
 	if (vty_read_config_file(config_file, NULL) < 0) {
 		LOGP(DCLIENT, LOGL_ERROR,
@@ -286,8 +285,8 @@ int main(int argc, char **argv)
 
 
 	/* attempt to connect to the remote */
-	if (pcap_client->conn.srv_ip && pcap_client->conn.srv_port > 0)
-		osmo_client_connect(&pcap_client->conn);
+	if (pcap_client->conn->srv_ip && pcap_client->conn->srv_port > 0)
+		osmo_client_connect(pcap_client->conn);
 
 	if (daemonize) {
 		rc = osmo_daemonize();

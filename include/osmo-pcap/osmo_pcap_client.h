@@ -137,5 +137,8 @@ struct osmo_pcap_handle *osmo_pcap_handle_alloc(struct osmo_pcap_client *client,
 void osmo_pcap_handle_free(struct osmo_pcap_handle *ph);
 int osmo_pcap_handle_start_capture(struct osmo_pcap_handle *ph);
 
+#define LOGCONN(conn, lvl, fmt, args...) \
+	LOGP(DCLIENT, lvl, "CONN(%s,%s:%d) " fmt, (conn)->name, (conn)->srv_ip, (conn)->srv_port, ## args)
+
 #define LOGPH(ph, lvl, fmt, args...) \
 	LOGP(DCLIENT, lvl, "PH(%s) " fmt, (ph)->devname, ## args)

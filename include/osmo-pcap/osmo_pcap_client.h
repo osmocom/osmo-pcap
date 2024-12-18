@@ -48,6 +48,14 @@ enum pcap_client_ctr {
 };
 extern const struct rate_ctr_group_desc pcap_client_ctr_group_desc;
 
+enum pcap_handle_ctr {
+	PH_CTR_PERR,
+	PH_CTR_P_RECV,
+	PH_CTR_P_DROP,
+	PH_CTR_P_IFDROP,
+};
+extern const struct rate_ctr_group_desc pcap_handle_ctr_group_desc;
+
 enum osmo_pcap_protocol {
 	PROTOCOL_OSMOPCAP,
 	PROTOCOL_IPIP,
@@ -85,6 +93,7 @@ struct osmo_pcap_client_conn {
 struct osmo_pcap_handle {
 	struct llist_head entry; /* item in (struct osmo_pcap_client)->handles */
 	struct osmo_pcap_client *client; /* back pointer */
+	unsigned int idx;
 	char *devname;
 	pcap_t *handle;
 	struct osmo_fd fd;
@@ -93,10 +102,13 @@ struct osmo_pcap_handle {
 	u_int last_ps_ifdrop;
 	struct osmo_timer_list pcap_stat_timer;
 	struct bpf_program bpf;
+	/* statistics */
+	struct rate_ctr_group *ctrg;
 };
 
 struct osmo_pcap_client {
 	struct llist_head handles; /* list of struct osmo_pcap_handle */
+	unsigned int next_pcap_handle_idx;
 
 	char *filter_string;
 	int filter_itself;
@@ -141,4 +153,4 @@ int osmo_pcap_handle_start_capture(struct osmo_pcap_handle *ph);
 	LOGP(DCLIENT, lvl, "CONN(%s,%s:%d) " fmt, (conn)->name, (conn)->srv_ip, (conn)->srv_port, ## args)
 
 #define LOGPH(ph, lvl, fmt, args...) \
-	LOGP(DCLIENT, lvl, "PH(%s) " fmt, (ph)->devname, ## args)
+	LOGP(DCLIENT, lvl, "PH(%u,%s) " fmt, (ph)->idx, (ph)->devname, ## args)

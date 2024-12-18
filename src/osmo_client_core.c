@@ -163,6 +163,7 @@ static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 
 	data = pcap_next(ph->handle, &hdr);
 	if (!data) {
+		rate_ctr_inc2(ph->ctrg, PH_CTR_PERR);
 		rate_ctr_inc2(client->ctrg, CLIENT_CTR_PERR);
 		return -1;
 	}
@@ -199,22 +200,13 @@ static uint64_t get_psbl_wrapped_ctr(u_int old_val, u_int new_val)
 	return new_val - old_val;
 }
 
-static void add_psbl_wrapped_ctr(struct osmo_pcap_client *client,
-				u_int *old_val, u_int new_val, int ctr)
-{
-	uint64_t inc;
-
-	inc = get_psbl_wrapped_ctr(*old_val, new_val);
-	rate_ctr_add2(client->ctrg, ctr, inc);
-	*old_val = new_val;
-}
-
 static void pcap_check_stats_cb(void *_ph)
 {
 	struct pcap_stat stat;
 	struct osmo_pcap_handle *ph = _ph;
 	struct osmo_pcap_client *client = ph->client;
 	int rc;
+	uint64_t inc;
 
 	/* reschedule */
 	osmo_timer_schedule(&ph->pcap_stat_timer, 10, 0);
@@ -223,13 +215,25 @@ static void pcap_check_stats_cb(void *_ph)
 	rc = pcap_stats(ph->handle, &stat);
 	if (rc != 0) {
 		LOGPH(ph, LOGL_ERROR, "Failed to query pcap stats: %s\n", pcap_geterr(ph->handle));
+		rate_ctr_inc2(ph->ctrg, PH_CTR_PERR);
 		rate_ctr_inc2(client->ctrg, CLIENT_CTR_PERR);
 		return;
 	}
 
-	add_psbl_wrapped_ctr(client, &ph->last_ps_recv, stat.ps_recv, CLIENT_CTR_P_RECV);
-	add_psbl_wrapped_ctr(client, &ph->last_ps_drop, stat.ps_drop, CLIENT_CTR_P_DROP);
-	add_psbl_wrapped_ctr(client, &ph->last_ps_ifdrop, stat.ps_ifdrop, CLIENT_CTR_P_IFDROP);
+	inc = get_psbl_wrapped_ctr(ph->last_ps_recv, stat.ps_recv);
+	rate_ctr_add2(ph->ctrg, PH_CTR_P_RECV, inc);
+	rate_ctr_add2(client->ctrg, CLIENT_CTR_P_RECV, inc);
+	ph->last_ps_recv = stat.ps_recv;
+
+	inc = get_psbl_wrapped_ctr(ph->last_ps_drop, stat.ps_drop);
+	rate_ctr_add2(ph->ctrg, PH_CTR_P_DROP, inc);
+	rate_ctr_add2(client->ctrg, CLIENT_CTR_P_DROP, inc);
+	ph->last_ps_drop = stat.ps_drop;
+
+	inc = get_psbl_wrapped_ctr(ph->last_ps_ifdrop, stat.ps_ifdrop);
+	rate_ctr_add2(ph->ctrg, PH_CTR_P_IFDROP, inc);
+	rate_ctr_add2(client->ctrg, CLIENT_CTR_P_IFDROP, inc);
+	ph->last_ps_ifdrop = stat.ps_ifdrop;
 }
 
 static int osmo_pcap_handle_install_filter(struct osmo_pcap_handle *ph)
@@ -390,7 +394,13 @@ struct osmo_pcap_handle *osmo_pcap_handle_alloc(struct osmo_pcap_client *client,
 	OSMO_ASSERT(ph->devname);
 
 	ph->client = client;
+	ph->idx = client->next_pcap_handle_idx++;
 	ph->fd.fd = -1;
+
+	/* initialize the stats interface */
+	ph->ctrg = rate_ctr_group_alloc(ph, &pcap_handle_ctr_group_desc, ph->idx);
+	OSMO_ASSERT(ph->ctrg);
+	rate_ctr_group_set_name(ph->ctrg, ph->devname);
 
 	llist_add_tail(&ph->entry, &client->handles);
 	return ph;
@@ -415,6 +425,9 @@ void osmo_pcap_handle_free(struct osmo_pcap_handle *ph)
 		pcap_close(ph->handle);
 		ph->handle = NULL;
 	}
+
+	rate_ctr_group_free(ph->ctrg);
+	ph->ctrg = NULL;
 
 	talloc_free(ph);
 }

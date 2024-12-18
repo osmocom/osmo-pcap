@@ -99,7 +99,7 @@ struct osmo_pcap_client {
 	int snaplen;
 	struct osmo_fd fd;
 
-	struct osmo_pcap_client_conn conn;
+	struct osmo_pcap_client_conn *conn;
 	struct llist_head conns;
 
 	/* statistics */
@@ -126,4 +126,4 @@ void osmo_client_reconnect(struct osmo_pcap_client_conn *);
 struct osmo_pcap_client_conn *osmo_client_find_or_create_conn(struct osmo_pcap_client *, const char *name);
 struct osmo_pcap_client_conn *osmo_client_find_conn(struct osmo_pcap_client *, const char *name);
 
-void osmo_client_conn_init(struct osmo_pcap_client_conn *conn, struct osmo_pcap_client *client);
+struct osmo_pcap_client_conn *osmo_client_conn_alloc(struct osmo_pcap_client *client, const char *name);

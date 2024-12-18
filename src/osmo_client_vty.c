@@ -40,7 +40,7 @@ static const struct value_string osmopcap_protocol_names[] = {
 static struct osmo_pcap_client_conn *get_conn(struct vty *vty)
 {
 	if (vty->node == CLIENT_NODE)
-		return &pcap_client->conn;
+		return pcap_client->conn;
 	return vty->index;
 }
 
@@ -115,6 +115,8 @@ static int config_write_server(struct vty *vty)
 	struct osmo_pcap_client_conn *conn;
 
 	llist_for_each_entry(conn, &pcap_client->conns, entry) {
+		if (conn == pcap_client->conn)
+			continue;
 		vty_out(vty, " pcap-store-connection %s%s", conn->name, VTY_NEWLINE);
 		write_client_conn_data(vty, conn, " ");
 		vty_out(vty, "  connect%s", VTY_NEWLINE);
@@ -141,7 +143,7 @@ static int config_write_client(struct vty *vty)
 		vty_out(vty, " pcap add-filter gprs%s", VTY_NEWLINE);
 
 
-	write_client_conn_data(vty, &pcap_client->conn, "");
+	write_client_conn_data(vty, pcap_client->conn, "");
 	return CMD_SUCCESS;
 }
 
@@ -445,7 +447,7 @@ DEFUN(cfg_pcap_store,
 {
 	struct osmo_pcap_client_conn *conn;
 	conn = osmo_client_find_or_create_conn(pcap_client, argv[0]);
-	if (!conn) {
+	if (!conn || conn == pcap_client->conn) {
 		vty_out(vty, "%%Failed to find/create conection %s%s",
 			argv[0], VTY_NEWLINE);
 		return CMD_WARNING;
@@ -463,7 +465,7 @@ DEFUN(cfg_no_pcap_store,
 {
 	struct osmo_pcap_client_conn *conn;
 	conn = osmo_client_find_conn(pcap_client, argv[0]);
-	if (!conn) {
+	if (!conn || conn == pcap_client->conn) {
 		vty_out(vty, "%%Failed to find connection %s%ss",
 			argv[0], VTY_NEWLINE);
 		return CMD_WARNING;

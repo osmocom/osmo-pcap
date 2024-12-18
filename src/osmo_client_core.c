@@ -168,7 +168,6 @@ static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 	if (!can_forward_packet(client, &hdr, data))
 		return 0;
 
-	osmo_client_send_data(&client->conn, &hdr, data);
 	llist_for_each_entry(conn, &client->conns, entry)
 		osmo_client_send_data(conn, &hdr, data);
 	return 0;
@@ -318,7 +317,6 @@ int osmo_client_capture(struct osmo_pcap_client *client, const char *device)
 	client->pcap_stat_timer.cb = pcap_check_stats_cb;
 	pcap_check_stats_cb(client);
 
-	osmo_client_send_link(&client->conn);
 	llist_for_each_entry(conn, &client->conns, entry)
 		osmo_client_send_link(conn);
 
@@ -334,15 +332,6 @@ int osmo_client_filter(struct osmo_pcap_client *client, const char *filter)
 	talloc_free(client->filter_string);
 	client->filter_string = talloc_strdup(client, filter);
 	return osmo_install_filter(client);
-}
-
-void osmo_client_conn_init(struct osmo_pcap_client_conn *conn,
-				struct osmo_pcap_client *client)
-{
-	conn->client = client;
-	conn->tls_verify = true;
-	osmo_wqueue_init(&conn->wqueue, WQUEUE_MAXLEN_DEFAULT);
-	conn->wqueue.bfd.fd = -1;
 }
 
 struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx)
@@ -391,7 +380,11 @@ struct osmo_pcap_client_conn *osmo_client_conn_alloc(
 	conn->name = talloc_strdup(conn, name);
 	OSMO_ASSERT(conn->name);
 
-	osmo_client_conn_init(conn, client);
+	conn->client = client;
+	conn->tls_verify = true;
+	osmo_wqueue_init(&conn->wqueue, WQUEUE_MAXLEN_DEFAULT);
+	conn->wqueue.bfd.fd = -1;
+
 	llist_add_tail(&conn->entry, &client->conns);
 	return conn;
 }

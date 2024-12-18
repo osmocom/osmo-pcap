@@ -121,8 +121,8 @@ void osmo_pcap_server_close_trace(struct osmo_pcap_conn *conn)
 
 	if (conn->curr_filename) {
 		client_event(conn, "closingtracefile", conn->curr_filename);
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->ctrg, PEER_CTR_PROTATE));
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->server->ctrg, SERVER_CTR_PROTATE));
+		rate_ctr_inc2(conn->ctrg, PEER_CTR_PROTATE);
+		rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PROTATE);
 		talloc_free(conn->curr_filename);
 		conn->curr_filename = NULL;
 	}
@@ -568,12 +568,12 @@ static int read_cb_data(struct osmo_pcap_conn *conn)
 		conn->pend = sizeof(*conn->data);
 
 		/* count the full packet we got */
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->ctrg, PEER_CTR_PKTS));
-		rate_ctr_inc(rate_ctr_group_get_ctr(conn->server->ctrg, SERVER_CTR_PKTS));
+		rate_ctr_inc2(conn->ctrg, PEER_CTR_PKTS);
+		rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PKTS);
 
 		/* count the bytes of it */
-		rate_ctr_add(rate_ctr_group_get_ctr(conn->ctrg, PEER_CTR_BYTES), conn->data->len);
-		rate_ctr_add(rate_ctr_group_get_ctr(conn->server->ctrg, SERVER_CTR_BYTES), conn->data->len);
+		rate_ctr_add2(conn->ctrg, PEER_CTR_BYTES, conn->data->len);
+		rate_ctr_add2(conn->server->ctrg, SERVER_CTR_BYTES, conn->data->len);
 
 		switch (conn->data->type) {
 		case PKT_LINK_HDR:
@@ -666,7 +666,7 @@ static void new_connection(struct osmo_pcap_server *server,
 		return;
 	}
 
-	rate_ctr_inc(rate_ctr_group_get_ctr(client->ctrg, PEER_CTR_CONNECT));
+	rate_ctr_inc2(client->ctrg, PEER_CTR_CONNECT);
 
 	client->state = STATE_INITIAL;
 	client->pend = sizeof(*client->data);
@@ -711,7 +711,7 @@ static int accept_cb(struct osmo_fd *fd, unsigned int when)
 	server = fd->data;
 
 	/* count any accept to see no clients */
-	rate_ctr_inc(rate_ctr_group_get_ctr(server->ctrg, SERVER_CTR_CONNECT));
+	rate_ctr_inc2(server->ctrg, SERVER_CTR_CONNECT);
 
 	llist_for_each_entry(conn, &server->conn, entry) {
 		if (conn->remote_addr.s_addr == addr.sin_addr.s_addr) {
@@ -723,7 +723,7 @@ static int accept_cb(struct osmo_fd *fd, unsigned int when)
 		}
 	}
 
-	rate_ctr_inc(rate_ctr_group_get_ctr(server->ctrg, SERVER_CTR_NOCLIENT));
+	rate_ctr_inc2(server->ctrg, SERVER_CTR_NOCLIENT);
 
 	/*
 	 * TODO: In the future start with a tls handshake and see if we know

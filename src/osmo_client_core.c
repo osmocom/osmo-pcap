@@ -390,7 +390,13 @@ struct osmo_pcap_handle *osmo_pcap_handle_alloc(struct osmo_pcap_client *client,
 	OSMO_ASSERT(ph->devname);
 
 	ph->client = client;
+	ph->idx = client->next_pcap_handle_idx++;
 	ph->fd.fd = -1;
+
+	/* initialize the stats interface */
+	ph->ctrg = rate_ctr_group_alloc(ph, &pcap_handle_ctr_group_desc, ph->idx);
+	OSMO_ASSERT(ph->ctrg);
+	rate_ctr_group_set_name(ph->ctrg, ph->devname);
 
 	llist_add_tail(&ph->entry, &client->handles);
 	return ph;
@@ -415,6 +421,9 @@ void osmo_pcap_handle_free(struct osmo_pcap_handle *ph)
 		pcap_close(ph->handle);
 		ph->handle = NULL;
 	}
+
+	rate_ctr_group_free(ph->ctrg);
+	ph->ctrg = NULL;
 
 	talloc_free(ph);
 }

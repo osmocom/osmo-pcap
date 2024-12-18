@@ -262,7 +262,6 @@ int main(int argc, char **argv)
 	}
 
 	/* initialize the queue */
-	INIT_LLIST_HEAD(&pcap_client->conns);
 	osmo_client_conn_init(&pcap_client->conn, pcap_client);
 	pcap_client->conn.name = "default";
 

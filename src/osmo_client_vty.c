@@ -170,14 +170,8 @@ DEFUN(cfg_client_device,
       PCAP_STRING "the device to filter\n" "device name\n")
 {
 	struct osmo_pcap_handle *ph = osmo_client_find_handle(pcap_client, argv[0]);
-	if (!ph) {
-		/* Only allow max one for now:*/
-		if (llist_count(&pcap_client->handles) > 0) {
-			vty_out(vty, "Only one 'pcap device' allowed! Remove the old one with 'no pcap device' first!%s", VTY_NEWLINE);
-			return CMD_WARNING;
-		}
+	if (!ph)
 		osmo_pcap_handle_alloc(pcap_client, argv[0]);
-	}
 	return CMD_SUCCESS;
 }
 

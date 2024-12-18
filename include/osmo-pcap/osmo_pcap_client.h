@@ -136,3 +136,6 @@ void osmo_client_conn_reconnect(struct osmo_pcap_client_conn *conn);
 struct osmo_pcap_handle *osmo_pcap_handle_alloc(struct osmo_pcap_client *client, const char *devname);
 void osmo_pcap_handle_free(struct osmo_pcap_handle *ph);
 int osmo_pcap_handle_start_capture(struct osmo_pcap_handle *ph);
+
+#define LOGPH(ph, lvl, fmt, args...) \
+	LOGP(DCLIENT, lvl, "PH(%s) " fmt, (ph)->devname, ## args)

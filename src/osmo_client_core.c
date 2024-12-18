@@ -126,8 +126,8 @@ static int can_forward_packet(
 		offset = 16;
 		break;
 	default:
-		LOGP(DCLIENT, LOGL_ERROR, "LL type %d/%s not handled.\n",
-			ll_type, pcap_datalink_val_to_name(ll_type));
+		LOGPH(ph, LOGL_ERROR, "LL type %d/%s not handled.\n",
+		      ll_type, pcap_datalink_val_to_name(ll_type));
 		return 1;
 	}
 
@@ -222,8 +222,7 @@ static void pcap_check_stats_cb(void *_ph)
 	memset(&stat, 0, sizeof(stat));
 	rc = pcap_stats(ph->handle, &stat);
 	if (rc != 0) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to query pcap stats: %s\n",
-			pcap_geterr(ph->handle));
+		LOGPH(ph, LOGL_ERROR, "Failed to query pcap stats: %s\n", pcap_geterr(ph->handle));
 		rate_ctr_inc(rate_ctr_group_get_ctr(client->ctrg, CLIENT_CTR_PERR));
 		return;
 	}
@@ -239,28 +238,25 @@ static int osmo_pcap_handle_install_filter(struct osmo_pcap_handle *ph)
 	pcap_freecode(&ph->bpf);
 
 	if (!ph->handle) {
-		LOGP(DCLIENT, LOGL_NOTICE,
-		    "Filter will only be applied later.\n");
+		LOGPH(ph, LOGL_NOTICE, "Filter will only be applied later\n");
 		return 0;
 	}
 
 	rc = pcap_compile(ph->handle, &ph->bpf,
 			  ph->client->filter_string, 1, PCAP_NETMASK_UNKNOWN);
 	if (rc != 0) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "Failed to compile the filter: %s\n",
+		LOGPH(ph, LOGL_ERROR, "Failed to compile the filter: %s\n",
 		     pcap_geterr(ph->handle));
 		return rc;
 	}
 
 	rc = pcap_setfilter(ph->handle, &ph->bpf);
 	if (rc != 0) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "Failed to set the filter on the interface: %s\n",
-		     pcap_geterr(ph->handle));
+		LOGPH(ph, LOGL_ERROR, "Failed to set the filter on the interface: %s\n", pcap_geterr(ph->handle));
 		pcap_freecode(&ph->bpf);
 		return rc;
 	}
+	LOGPH(ph, LOGL_INFO, "Filter applied\n");
 
 	return rc;
 }
@@ -418,25 +414,22 @@ int osmo_pcap_handle_start_capture(struct osmo_pcap_handle *ph)
 	int fd;
 	char errbuf[PCAP_ERRBUF_SIZE];
 
-	LOGP(DCLIENT, LOGL_INFO, "Opening device %s for capture with snaplen %zu\n",
-	     ph->devname, (size_t) client->snaplen);
+	LOGPH(ph, LOGL_INFO, "Opening device for capture with snaplen %zu\n", (size_t) client->snaplen);
 	ph->handle = pcap_open_live(ph->devname, client->snaplen, 0, 1000, errbuf);
 	if (!ph->handle) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "Failed to open the device: %s\n", errbuf);
+		LOGPH(ph, LOGL_ERROR, "Failed to open the device: %s\n", errbuf);
 		return -2;
 	}
 
 	fd = pcap_fileno(ph->handle);
 	if (fd == -1) {
-		LOGP(DCLIENT, LOGL_ERROR, "No file descriptor provided.\n");
+		LOGPH(ph, LOGL_ERROR, "No file descriptor provided.\n");
 		return -3;
 	}
 
 	osmo_fd_setup(&ph->fd, fd, OSMO_FD_READ, pcap_read_cb, ph, 0);
 	if (osmo_fd_register(&ph->fd) != 0) {
-		LOGP(DCLIENT, LOGL_ERROR,
-		     "Failed to register the fd.\n");
+		LOGPH(ph, LOGL_ERROR, "Failed to register the fd.\n");
 		return -4;
 	}
 

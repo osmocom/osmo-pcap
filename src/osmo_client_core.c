@@ -179,24 +179,31 @@ static inline u_int P_CAP_UINT_MAX()
 	return ~val;
 }
 
+static uint64_t get_psbl_wrapped_ctr(u_int old_val, u_int new_val)
+{
+	uint64_t ret;
+	/*
+	* Wrapped..
+	* So let's at from N to XYZ_MAX
+	* and then from 0 to new_val
+	* Only issue is we don't know sizeof(u_int)
+	*/
+	if (old_val > new_val) {
+		ret = P_CAP_UINT_MAX() - old_val;
+		ret += new_val;
+		return ret;
+	}
+	/* old_val <= new_val, Just increment it */
+	return new_val - old_val;
+}
+
 static void add_psbl_wrapped_ctr(struct osmo_pcap_client *client,
 				u_int *old_val, u_int new_val, int ctr)
 {
-	/*
-	 * Wrapped..
-	 * So let's at from N to XYZ_MAX
-	 * and then from 0 to new_val
-	 * Only issue is we don't know sizeof(u_int)
-	 */
-	if (*old_val > new_val) {
-		rate_ctr_add(rate_ctr_group_get_ctr(client->ctrg, ctr), P_CAP_UINT_MAX() - *old_val);
-		rate_ctr_add(rate_ctr_group_get_ctr(client->ctrg, ctr), new_val);
-		*old_val = new_val;
-		return;
-	}
+	uint64_t inc;
 
-	/* Just increment it */
-	rate_ctr_add(rate_ctr_group_get_ctr(client->ctrg, ctr), new_val - *old_val);
+	inc = get_psbl_wrapped_ctr(*old_val, new_val);
+	rate_ctr_add(rate_ctr_group_get_ctr(client->ctrg, ctr), inc);
 	*old_val = new_val;
 }
 

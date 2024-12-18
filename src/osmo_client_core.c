@@ -379,28 +379,31 @@ struct osmo_pcap_client_conn *osmo_client_find_conn(
 	return NULL;
 }
 
+struct osmo_pcap_client_conn *osmo_client_conn_alloc(
+				struct osmo_pcap_client *client,
+				const char *name)
+{
+	struct osmo_pcap_client_conn *conn;
+
+	conn = talloc_zero(client, struct osmo_pcap_client_conn);
+	OSMO_ASSERT(conn);
+
+	conn->name = talloc_strdup(conn, name);
+	OSMO_ASSERT(conn->name);
+
+	osmo_client_conn_init(conn, client);
+	llist_add_tail(&conn->entry, &client->conns);
+	return conn;
+}
+
 struct osmo_pcap_client_conn *osmo_client_find_or_create_conn(
 				struct osmo_pcap_client *client,
 				const char *name)
 {
-	struct osmo_pcap_client_conn *conn = osmo_client_find_conn(client, name);;
+	struct osmo_pcap_client_conn *conn;
 
-	if (conn)
-		return conn;
-
-	conn = talloc_zero(client, struct osmo_pcap_client_conn);
-	if (!conn) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate conn for %s\n", name);
-		return NULL;
-	}
-	conn->name = talloc_strdup(conn, name);
-	if (!conn->name) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate name for %s\n", name);
-		talloc_free(conn);
-		return NULL;
-	}
-
-	osmo_client_conn_init(conn, client);
-	llist_add_tail(&conn->entry, &client->conns);
+	conn = osmo_client_find_conn(client, name);
+	if (!conn)
+		conn = osmo_client_conn_alloc(client, name);
 	return conn;
 }

@@ -163,7 +163,7 @@ static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 
 	data = pcap_next(ph->handle, &hdr);
 	if (!data) {
-		rate_ctr_inc(rate_ctr_group_get_ctr(client->ctrg, CLIENT_CTR_PERR));
+		rate_ctr_inc2(client->ctrg, CLIENT_CTR_PERR);
 		return -1;
 	}
 
@@ -205,7 +205,7 @@ static void add_psbl_wrapped_ctr(struct osmo_pcap_client *client,
 	uint64_t inc;
 
 	inc = get_psbl_wrapped_ctr(*old_val, new_val);
-	rate_ctr_add(rate_ctr_group_get_ctr(client->ctrg, ctr), inc);
+	rate_ctr_add2(client->ctrg, ctr, inc);
 	*old_val = new_val;
 }
 
@@ -223,7 +223,7 @@ static void pcap_check_stats_cb(void *_ph)
 	rc = pcap_stats(ph->handle, &stat);
 	if (rc != 0) {
 		LOGPH(ph, LOGL_ERROR, "Failed to query pcap stats: %s\n", pcap_geterr(ph->handle));
-		rate_ctr_inc(rate_ctr_group_get_ctr(client->ctrg, CLIENT_CTR_PERR));
+		rate_ctr_inc2(client->ctrg, CLIENT_CTR_PERR);
 		return;
 	}
 

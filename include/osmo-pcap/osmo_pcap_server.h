@@ -140,6 +140,7 @@ struct osmo_pcap_server {
 	bool dh_params_allocated;
 
 	char *base_path;
+	char *completed_path;
 	mode_t permission_mask;
 	off_t max_size;
 	bool max_size_enabled;

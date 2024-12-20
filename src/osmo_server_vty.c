@@ -96,8 +96,7 @@ static int config_write_server(struct vty *vty)
 
 	vty_out(vty, "server%s", VTY_NEWLINE);
 
-	if (pcap_server->base_path)
-		vty_out(vty, " base-path %s%s", pcap_server->base_path, VTY_NEWLINE);
+	vty_out(vty, " base-path %s%s", pcap_server->base_path, VTY_NEWLINE);
 	vty_out(vty, " file-permission-mask 0%o%s", pcap_server->permission_mask, VTY_NEWLINE);
 	if (pcap_server->addr)
 		vty_out(vty, " server ip %s%s", pcap_server->addr, VTY_NEWLINE);

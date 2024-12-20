@@ -149,8 +149,7 @@ DEFUN(cfg_server_base,
       "base-path PATH",
       "Base path for log files\n" "Path\n")
 {
-	talloc_free(pcap_server->base_path);
-	pcap_server->base_path = talloc_strdup(pcap_server, argv[0]);
+	osmo_talloc_replace_string(pcap_server, &pcap_server->base_path, argv[0]);
 	return CMD_SUCCESS;
 }
 

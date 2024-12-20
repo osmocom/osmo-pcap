@@ -217,7 +217,7 @@ static bool check_restart_pcap_max_size(struct osmo_pcap_conn *conn, const struc
 {
 	off_t cur;
 
-	if (pcap_server->max_size_enabled)
+	if (!pcap_server->max_size_enabled)
 		return false;
 	cur = lseek(conn->local_fd, 0, SEEK_CUR);
 	if (cur + data->len <= conn->server->max_size)

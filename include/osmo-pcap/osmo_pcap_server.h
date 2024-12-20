@@ -87,6 +87,7 @@ struct osmo_pcap_conn {
 	/* Remote connection */
 	struct osmo_wqueue rem_wq;
 	int local_fd;
+	/* canonicalized absolute pathname of pcap file we write to */
 	char *curr_filename;
 
 	/* pcap stuff */

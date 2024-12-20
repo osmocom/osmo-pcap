@@ -166,6 +166,7 @@ static void restart_pcap(struct osmo_pcap_conn *conn)
 	time_t now = time(NULL);
 	struct tm tm;
 	int rc;
+	char *real_base_path;
 
 	osmo_pcap_server_close_trace(conn);
 
@@ -178,11 +179,17 @@ static void restart_pcap(struct osmo_pcap_conn *conn)
 	}
 
 	localtime_r(&now, &tm);
+	real_base_path = realpath(conn->server->base_path, NULL);
+	if (!real_base_path) {
+		LOGP(DSERVER, LOGL_ERROR, "Failed to resolve real path '%s': %s\n",
+		     conn->server->base_path, strerror(errno));
+		return;
+	}
 	conn->curr_filename = talloc_asprintf(conn, "%s/trace-%s-%d%.2d%.2d_%.2d%.2d%.2d.pcap",
-				   conn->server->base_path, conn->name,
-				   tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-				   tm.tm_hour, tm.tm_min, tm.tm_sec);
-
+					      real_base_path, conn->name,
+					      tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+					      tm.tm_hour, tm.tm_min, tm.tm_sec);
+	free(real_base_path);
 	if (!conn->curr_filename) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to assemble filename for %s.\n", conn->name);
 		return;

@@ -148,6 +148,13 @@ DEFUN(cfg_server_base,
       "base-path PATH",
       "Base path for log files\n" "Path\n")
 {
+	/* Validate we can resolve path: */
+	char *tmp = realpath(argv[0], NULL);
+	if (!tmp) {
+		vty_out(vty, "%% Failed to resolve path '%s': %s%s", argv[0], strerror(errno), VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	free(tmp);
 	osmo_talloc_replace_string(pcap_server, &pcap_server->base_path, argv[0]);
 	return CMD_SUCCESS;
 }

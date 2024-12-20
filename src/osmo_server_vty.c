@@ -97,6 +97,8 @@ static int config_write_server(struct vty *vty)
 	vty_out(vty, "server%s", VTY_NEWLINE);
 
 	vty_out(vty, " base-path %s%s", pcap_server->base_path, VTY_NEWLINE);
+	if (pcap_server->completed_path)
+		vty_out(vty, " completed-path %s%s", pcap_server->completed_path, VTY_NEWLINE);
 	vty_out(vty, " file-permission-mask 0%o%s", pcap_server->permission_mask, VTY_NEWLINE);
 	if (pcap_server->addr)
 		vty_out(vty, " server ip %s%s", pcap_server->addr, VTY_NEWLINE);
@@ -156,6 +158,31 @@ DEFUN(cfg_server_base,
 	}
 	free(tmp);
 	osmo_talloc_replace_string(pcap_server, &pcap_server->base_path, argv[0]);
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_server_no_completed_path,
+      cfg_server_no_completed_path_cmd,
+      "no completed-path",
+      NO_STR "Base path for completed (already closed, rotated) log files. Completed files won't be moved.\n")
+{
+	TALLOC_FREE(pcap_server->completed_path);
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_server_completed_path,
+      cfg_server_completed_path_cmd,
+      "completed-path PATH",
+      "Base path for completed (already closed, rotated) log files\n" "Path\n")
+{
+	/* Validate we can resolve path: */
+	char *tmp = realpath(argv[0], NULL);
+	if (!tmp) {
+		vty_out(vty, "%% Failed to resolve path '%s': %s%s", argv[0], strerror(errno), VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	free(tmp);
+	osmo_talloc_replace_string(pcap_server, &pcap_server->completed_path, argv[0]);
 	return CMD_SUCCESS;
 }
 
@@ -671,6 +698,8 @@ void vty_server_init(void)
 	install_node(&server_node, config_write_server);
 
 	install_element(SERVER_NODE, &cfg_server_base_cmd);
+	install_element(SERVER_NODE, &cfg_server_no_completed_path_cmd);
+	install_element(SERVER_NODE, &cfg_server_completed_path_cmd);
 	install_element(SERVER_NODE, &cfg_server_file_permission_mask_cmd);
 	install_element(SERVER_NODE, &cfg_server_ip_cmd);
 	install_element(SERVER_NODE, &cfg_server_port_cmd);

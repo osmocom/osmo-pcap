@@ -39,6 +39,9 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <libgen.h>
 
 static void pcap_zmq_send(void *publ, const void *data, size_t len, int flags)
 {
@@ -112,12 +115,92 @@ static void client_data(struct osmo_pcap_conn *conn,
 			0);
 }
 
+/* Move pcap file from base_path to completed_path, and updates
+ * conn->curr_filename to point to new location. */
+void move_completed_trace_if_needed(struct osmo_pcap_conn *conn)
+{
+	struct osmo_pcap_server *server = conn->server;
+	char *curr_filename_cpy_bname = NULL;
+	char *curr_filename_cpy_dname = NULL;
+	char *bname = NULL;
+	char *curr_dirname = NULL;
+	char *new_dirname = NULL;
+	char *new_filename = NULL;
+	size_t new_filename_len;
+	int rc;
+
+	if (!conn->curr_filename)
+		return;
+
+	if (!server->completed_path)
+		return;
+
+	/* Assumption: curr_filename is anonicalized absolute pathname. */
+
+	/* basename and dirname may modify input param, and return a string
+	 * which shall not be freed, potentially pointing to the input param. */
+	curr_filename_cpy_dname = talloc_strdup(conn, conn->curr_filename);
+	curr_filename_cpy_bname = talloc_strdup(conn, conn->curr_filename);
+	if (!curr_filename_cpy_dname || !curr_filename_cpy_bname)
+		goto ret_free1;
+
+	curr_dirname = dirname(curr_filename_cpy_dname);
+	bname = basename(curr_filename_cpy_bname);
+	if (!curr_dirname || !bname) {
+		LOGP(DSERVER, LOGL_ERROR, "Failed to resolve dirname and basename for '%s'\n",
+		     conn->curr_filename);
+		goto ret_free1;
+	}
+
+	new_dirname = realpath(server->completed_path, NULL);
+	if (!new_dirname) {
+		LOGP(DSERVER, LOGL_ERROR, "Failed to resolve path '%s': %s\n",
+		     server->completed_path, strerror(errno));
+		goto ret_free1;
+	}
+
+	new_filename_len = strlen(new_dirname) + 1 /* '/' */ + strlen(bname) + 1 /* '\0' */;
+	new_filename = talloc_size(conn, new_filename_len);
+	if (!new_filename)
+		goto ret_free1;
+	rc = snprintf(new_filename, new_filename_len, "%s/%s", new_dirname, bname);
+	if (rc != new_filename_len - 1)
+		goto ret_free2;
+
+	LOGP(DSERVER, LOGL_INFO, "Moving completed pcap file '%s' -> '%s'\n", conn->curr_filename, new_filename);
+	rc = rename(conn->curr_filename, new_filename);
+	if (rc == -1) {
+		int err = errno;
+		LOGP(DSERVER, LOGL_ERROR, "Failed moving completed pcap file '%s' -> '%s': %s\n",
+		     conn->curr_filename, new_filename, strerror(err));
+		if (err == EXDEV)
+			LOGP(DSERVER, LOGL_ERROR, "Fix your config! %s and %s shall not be in different filesystems!\n",
+			     curr_dirname, new_dirname);
+		goto ret_free2;
+	}
+
+	/* Now replace conn->curr_filename with new path: */
+	talloc_free(conn->curr_filename);
+	conn->curr_filename = new_filename;
+	/* new_filename has been assigned, so we don't want to free it, hence move to ret_free1: */
+	goto ret_free1;
+
+ret_free2:
+	talloc_free(new_filename);
+ret_free1:
+	free(new_dirname);
+	talloc_free(curr_filename_cpy_bname);
+	talloc_free(curr_filename_cpy_dname);
+}
+
 void osmo_pcap_server_close_trace(struct osmo_pcap_conn *conn)
 {
 	if (conn->local_fd >= 0) {
 		close(conn->local_fd);
 		conn->local_fd = -1;
 	}
+
+	move_completed_trace_if_needed(conn);
 
 	if (conn->curr_filename) {
 		client_event(conn, "closingtracefile", conn->curr_filename);

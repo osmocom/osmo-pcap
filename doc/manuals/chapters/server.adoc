@@ -125,3 +125,31 @@ WARNING:: If wall clock goes backward (eg. due to drift correction or Daylight
 Saving procedure), osmo-pcap-server may end up recreating (and truncating) a
 previous pcap file if it is generated with the same localtime timestamp, for
 instance because connection from osmo-pcap-client was re-established.
+
+=== Completed pcap directory
+
+`osmo-pcap-server` creates and writes data to opened pcap files in the
+`base-path` directory configured through VTY. Furthermore, if user supplies a
+`completed-path` directory through the VTY, `osmo-pcap-server` will move the
+file from `base-path` to `completed-path` directory once it closes the current
+file due to rotation or because `osmo-pcap-client` became disconnected. The file
+name is kept when moving from one directory to the other.
+
+This feature is useful for users willing to have an external tool to monitor a
+directory for new closed pcap files and then acting on them, eg. to gather
+statistics of packets.
+
+.Example: Move files from /tmp/recording to /tmp/done
+----
+server
+ ...
+ base-path /tmp/recording <1>
+ completed-path /tmp/done <2>
+----
+<1> Files are opened and recorded under /tmp/recording
+<2> Once closed files are moved under /tmp/done
+
+NOTE:: `osmo-pcap-server` uses a rename() call to move the file atomically.
+However, this has the drawback that both `base-path` and `completed-path` must
+be placed in the same filesystem mounting point. Using directories in different
+filesystem mount points will fail.

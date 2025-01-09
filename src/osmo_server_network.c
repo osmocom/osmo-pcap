@@ -628,16 +628,17 @@ static int read_cb_initial(struct osmo_pcap_conn *conn)
 		LOGP(DSERVER, LOGL_ERROR,
 		     "Someone got the pending read wrong: %d\n", conn->pend);
 		return -1;
-	} else if (conn->pend == 0) {
-		conn->data->len = ntohs(conn->data->len);
-
-		if (!pcap_data_valid(conn))
-			return -1;
-
-		conn->state = STATE_DATA;
-		conn->pend = conn->data->len;
 	}
+	if (conn->pend > 0)
+		return 1; /* Wait for more data before continuing */
 
+	conn->data->len = ntohs(conn->data->len);
+
+	if (!pcap_data_valid(conn))
+		return -1;
+
+	conn->state = STATE_DATA;
+	conn->pend = conn->data->len;
 	return 1;
 }
 
@@ -659,29 +660,33 @@ static int read_cb_data(struct osmo_pcap_conn *conn)
 		LOGP(DSERVER, LOGL_ERROR,
 		     "Someone got the pending read wrong: %d\n", conn->pend);
 		return -1;
-	} else if (conn->pend == 0) {
-		conn->state = STATE_INITIAL;
-		conn->pend = sizeof(*conn->data);
+	}
+	if (conn->pend > 0)
+		return 1; /* Wait for more data before continuing */
 
-		/* count the full packet we got */
-		rate_ctr_inc2(conn->ctrg, PEER_CTR_PKTS);
-		rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PKTS);
+	conn->state = STATE_INITIAL;
+	conn->pend = sizeof(*conn->data);
 
-		/* count the bytes of it */
-		rate_ctr_add2(conn->ctrg, PEER_CTR_BYTES, conn->data->len);
-		rate_ctr_add2(conn->server->ctrg, SERVER_CTR_BYTES, conn->data->len);
+	/* count the full packet we got */
+	rate_ctr_inc2(conn->ctrg, PEER_CTR_PKTS);
+	rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PKTS);
 
-		switch (conn->data->type) {
-		case PKT_LINK_HDR:
-			return rx_link_hdr(conn, conn->data);
-			break;
-		case PKT_LINK_DATA:
-			return rx_link_data(conn, conn->data);
-			break;
-		}
+	/* count the bytes of it */
+	rate_ctr_add2(conn->ctrg, PEER_CTR_BYTES, conn->data->len);
+	rate_ctr_add2(conn->server->ctrg, SERVER_CTR_BYTES, conn->data->len);
+
+	switch (conn->data->type) {
+	case PKT_LINK_HDR:
+		rc = rx_link_hdr(conn, conn->data);
+		break;
+	case PKT_LINK_DATA:
+		rc = rx_link_data(conn, conn->data);
+		break;
+	default:
+		OSMO_ASSERT(0);
 	}
 
-	return 1;
+	return rc;
 }
 
 /* returns >0 on success, <= 0 on failure (closes conn) */

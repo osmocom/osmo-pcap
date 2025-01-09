@@ -19,9 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-#ifndef WIREFORMAT_H
-#define WIREFORMAT_H
+#pragma once
 
 #include <inttypes.h>
 #include <pcap.h>
@@ -49,5 +47,3 @@ struct osmo_pcap_pkthdr {
 	uint32_t caplen;
 	uint32_t len;
 } __attribute__((packed));
-
-#endif

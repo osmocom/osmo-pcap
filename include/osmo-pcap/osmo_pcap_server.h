@@ -19,9 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-#ifndef OSMO_PCAP_SERVER_H
-#define OSMO_PCAP_SERVER_H
+#pragma once
 
 #include "wireformat.h"
 #include "osmo_tls.h"
@@ -168,5 +166,3 @@ void osmo_pcap_server_delete(struct osmo_pcap_conn *conn);
 void vty_server_init(void);
 void osmo_pcap_server_close_trace(struct osmo_pcap_conn *conn);
 void osmo_pcap_server_close_conn(struct osmo_pcap_conn *conn);
-
-#endif

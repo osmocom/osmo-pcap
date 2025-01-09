@@ -296,7 +296,7 @@ static void restart_pcap(struct osmo_pcap_conn *conn)
 	update_last_write(conn, now);
 }
 
-static int link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
+static int rx_link_hdr(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 {
 	struct pcap_file_header *hdr;
 
@@ -460,7 +460,7 @@ static bool check_restart_pcap_localtime(struct osmo_pcap_conn *conn, time_t now
 /*
  * Check if we are past the limit or on a day change
  */
-static int write_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
+static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 {
 	time_t now = time(NULL);
 	int rc;
@@ -667,10 +667,10 @@ static int read_cb_data(struct osmo_pcap_conn *conn)
 
 		switch (conn->data->type) {
 		case PKT_LINK_HDR:
-			return link_data(conn, conn->data);
+			return rx_link_hdr(conn, conn->data);
 			break;
 		case PKT_LINK_DATA:
-			return write_data(conn, conn->data);
+			return rx_link_data(conn, conn->data);
 			break;
 		}
 	}

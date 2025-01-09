@@ -296,6 +296,7 @@ static void restart_pcap(struct osmo_pcap_conn *conn)
 	update_last_write(conn, now);
 }
 
+/* returns >0 on success, <= 0 on failure (closes conn) */
 static int rx_link_hdr(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 {
 	struct pcap_file_header *hdr;
@@ -459,9 +460,7 @@ static bool check_restart_pcap_localtime(struct osmo_pcap_conn *conn, time_t now
 	return true;
 }
 
-/*
- * Check if we are past the limit or on a day change
- */
+/* returns >0 on success, <= 0 on failure (closes conn) */
 static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 {
 	time_t now = time(NULL);
@@ -479,6 +478,7 @@ static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data
 		return -1;
 	}
 
+	/* Check if we are past the limit or on a day change. */
 	if (!check_restart_pcap_max_size(conn, data))
 		check_restart_pcap_localtime(conn, now);
 
@@ -610,6 +610,8 @@ static bool pcap_data_valid(struct osmo_pcap_conn *conn)
 	return true;
 }
 
+/* Read segment header, struct osmo_pcap_data (without payload)
+ * returns >0 on success, <= 0 on failure (closes conn) */
 static int read_cb_initial(struct osmo_pcap_conn *conn)
 {
 	int rc;
@@ -639,6 +641,8 @@ static int read_cb_initial(struct osmo_pcap_conn *conn)
 	return 1;
 }
 
+/* Read segment payload, of size conn->data->len.
+ * returns >0 on success, <= 0 on failure (closes conn) */
 static int read_cb_data(struct osmo_pcap_conn *conn)
 {
 	int rc;
@@ -680,6 +684,7 @@ static int read_cb_data(struct osmo_pcap_conn *conn)
 	return 1;
 }
 
+/* returns >0 on success, <= 0 on failure (closes conn) */
 static int dispatch_read(struct osmo_pcap_conn *conn)
 {
 	if (conn->state == STATE_INITIAL) {
@@ -760,6 +765,7 @@ static void new_connection(struct osmo_pcap_server *server,
 
 	rate_ctr_inc2(client->ctrg, PEER_CTR_CONNECT);
 
+	/* Prepare for first read of segment header: */
 	client->state = STATE_INITIAL;
 	client->pend = sizeof(*client->data);
 

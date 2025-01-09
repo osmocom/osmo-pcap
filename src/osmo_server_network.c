@@ -499,16 +499,11 @@ void osmo_pcap_server_delete(struct osmo_pcap_conn *conn)
 	talloc_free(conn);
 }
 
-struct osmo_pcap_conn *osmo_pcap_server_find(struct osmo_pcap_server *server,
-					     const char *name)
+static struct osmo_pcap_conn *osmo_pcap_conn_alloc(struct osmo_pcap_server *server,
+						   const char *name)
 {
-	struct rate_ctr_group_desc *desc;
 	struct osmo_pcap_conn *conn;
-
-	llist_for_each_entry(conn, &server->conn, entry) {
-		if (strcmp(conn->name, name) == 0)
-			return conn;
-	}
+	struct rate_ctr_group_desc *desc;
 
 	conn = talloc_zero(server, struct osmo_pcap_conn);
 	if (!conn) {
@@ -561,6 +556,19 @@ struct osmo_pcap_conn *osmo_pcap_server_find(struct osmo_pcap_server *server,
 	conn->server = server;
 	llist_add_tail(&conn->entry, &server->conn);
 	return conn;
+}
+
+struct osmo_pcap_conn *osmo_pcap_server_find_or_create(
+				struct osmo_pcap_server *server,
+				const char *name)
+{
+	struct osmo_pcap_conn *conn;
+
+	llist_for_each_entry(conn, &server->conn, entry) {
+		if (strcmp(conn->name, name) == 0)
+			return conn;
+	}
+	return osmo_pcap_conn_alloc(server, name);
 }
 
 static int do_read_tls(struct osmo_pcap_conn *conn, void *buf, size_t want_size)

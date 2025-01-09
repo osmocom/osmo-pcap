@@ -354,7 +354,7 @@ static int manage_client(struct osmo_pcap_server *pcap_server,
 			bool store, bool use_tls)
 {
 	struct osmo_pcap_conn *conn;
-	conn = osmo_pcap_server_find(pcap_server, name);
+	conn = osmo_pcap_server_find_or_create(pcap_server, name);
 	if (!conn) {
 		vty_out(vty, "Failed to create a pcap server.\n");
 		return CMD_WARNING;
@@ -403,7 +403,7 @@ DEFUN(cfg_server_no_client,
       NO_STR CLIENT_STR "The name\n")
 {
 	struct osmo_pcap_conn *conn;
-	conn = osmo_pcap_server_find(pcap_server, argv[0]);
+	conn = osmo_pcap_server_find_or_create(pcap_server, argv[0]);
 	if (!conn) {
 		vty_out(vty, "Failed to create a pcap server.\n");
 		return CMD_WARNING;

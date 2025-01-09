@@ -686,6 +686,12 @@ static int read_cb_data(struct osmo_pcap_conn *conn)
 		OSMO_ASSERT(0);
 	}
 
+	if (conn->reopen_delayed) {
+		LOGP(DSERVER, LOGL_INFO, "Reopening log for %s now.\n", conn->name);
+		restart_pcap(conn);
+		conn->reopen_delayed = false;
+	}
+
 	return rc;
 }
 
@@ -693,11 +699,6 @@ static int read_cb_data(struct osmo_pcap_conn *conn)
 static int dispatch_read(struct osmo_pcap_conn *conn)
 {
 	if (conn->state == STATE_INITIAL) {
-		if (conn->reopen) {
-			LOGP(DSERVER, LOGL_INFO, "Reopening log for %s now.\n", conn->name);
-			restart_pcap(conn);
-			conn->reopen = 0;
-		}
 		return read_cb_initial(conn);
 	} else if (conn->state == STATE_DATA) {
 		return read_cb_data(conn);
@@ -874,7 +875,7 @@ void osmo_pcap_server_reopen(struct osmo_pcap_server *server)
 			restart_pcap(conn);
 		} else {
 			LOGP(DSERVER, LOGL_INFO, "Delaying %s until current packet is complete.\n", conn->name);
-			conn->reopen = 1;
+			conn->reopen_delayed = true;
 		}
 	}
 }

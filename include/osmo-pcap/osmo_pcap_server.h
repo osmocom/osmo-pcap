@@ -97,7 +97,7 @@ struct osmo_pcap_conn {
 	/* read buffering */
 	int state;
 	int pend;
-	int reopen;
+	bool reopen_delayed;
 	struct osmo_pcap_data *data;
 
 	/* statistics */

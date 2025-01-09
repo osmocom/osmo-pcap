@@ -128,7 +128,7 @@ static int config_write_server(struct vty *vty)
 	llist_for_each_entry(conn, &pcap_server->conn, entry) {
 		vty_out(vty, " client %s %s%s%s%s",
 			conn->name, conn->remote_host,
-			conn->no_store ? " no-store" : " store",
+			conn->store ? " store" : " no-store",
 			conn->tls_use ? " tls" : "",
 			VTY_NEWLINE);
 	}
@@ -351,7 +351,7 @@ DEFUN(cfg_server_max_snaplen,
 static int manage_client(struct osmo_pcap_server *pcap_server,
 			struct vty *vty,
 			const char *name, const char *remote_host,
-			bool no_store, bool use_tls)
+			bool store, bool use_tls)
 {
 	struct osmo_pcap_conn *conn;
 	conn = osmo_pcap_server_find(pcap_server, name);
@@ -364,12 +364,10 @@ static int manage_client(struct osmo_pcap_server *pcap_server,
 	conn->remote_host = talloc_strdup(pcap_server, remote_host);
 	inet_aton(remote_host, &conn->remote_addr);
 
-	/* Checking no-store and maybe closing a pcap file */
-	if (no_store) {
+	/* Checking store and maybe closing a pcap file */
+	if (!store)
 		osmo_pcap_server_close_trace(conn);
-		conn->no_store = 1;
-	} else
-		conn->no_store = 0;
+	conn->store = store;
 
 	if (use_tls) {
 		/* force moving to TLS */
@@ -383,25 +381,20 @@ static int manage_client(struct osmo_pcap_server *pcap_server,
 	return CMD_SUCCESS;
 }
 
-
 DEFUN(cfg_server_client,
       cfg_server_client_cmd,
-      "client NAME A.B.C.D [no-store] [tls]",
-      CLIENT_STR "Remote name used in filenames\n"
-      "IP of the remote\n" "Do not store traffic\n"
+      "client NAME A.B.C.D [(store|no-store)] [tls]",
+      CLIENT_STR
+      "Remote name used in filenames\n"
+      "IP of the remote\n"
+      "Store traffic\n" "Do not store traffic\n"
       "Use Transport Level Security\n")
 {
-	return manage_client(pcap_server, vty, argv[0], argv[1], argc >= 3, argc >= 4);
-}
-
-DEFUN(cfg_server_client_store_tls,
-      cfg_server_client_store_tls_cmd,
-      "client NAME A.B.C.D store [tls]",
-      CLIENT_STR "Remote name used in filenames\n"
-      "IP of the remote\n" "Do not store traffic\n"
-      "Use Transport Level Security\n")
-{
-	return manage_client(pcap_server, vty, argv[0], argv[1], false, argc >= 3);
+	bool store = true;
+	if (argc >= 3 && strcmp(argv[2], "no-store") == 0)
+		store = false;
+	bool tls = argc >= 4;
+	return manage_client(pcap_server, vty, argv[0], argv[1], store, tls);
 }
 
 DEFUN(cfg_server_no_client,
@@ -734,6 +727,5 @@ void vty_server_init(void)
 	install_element(SERVER_NODE, &cfg_tls_dh_pkcs3_cmd);
 
 	install_element(SERVER_NODE, &cfg_server_client_cmd);
-	install_element(SERVER_NODE, &cfg_server_client_store_tls_cmd);
 	install_element(SERVER_NODE, &cfg_server_no_client_cmd);
 }

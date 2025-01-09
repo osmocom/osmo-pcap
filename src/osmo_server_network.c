@@ -254,7 +254,7 @@ static void restart_pcap(struct osmo_pcap_conn *conn)
 	osmo_pcap_server_close_trace(conn);
 
 	/* omit any storing/creation of the file */
-	if (conn->no_store) {
+	if (!conn->store) {
 		update_last_write(conn, now);
 		talloc_free(conn->curr_filename);
 		conn->curr_filename = NULL;
@@ -309,10 +309,12 @@ static int rx_link_hdr(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
 		return -1;
 	}
 
-	if (!conn->no_store && conn->local_fd < 0) {
+	if (conn->store && conn->local_fd < 0) {
+		/* First received link hdr in conn */
 		conn->file_hdr = *hdr;
 		restart_pcap(conn);
 	} else if (memcmp(&conn->file_hdr, hdr, sizeof(*hdr)) != 0) {
+		/* Client changed the link hdr in conn */
 		conn->file_hdr = *hdr;
 		restart_pcap(conn);
 	}
@@ -467,7 +469,7 @@ static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data
 
 	client_data(conn, data);
 
-	if (conn->no_store) {
+	if (!conn->store) {
 		update_last_write(conn, now);
 		return 1;
 	}

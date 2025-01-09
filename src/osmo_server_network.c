@@ -492,7 +492,7 @@ static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data
 }
 
 
-void osmo_pcap_server_delete(struct osmo_pcap_conn *conn)
+void osmo_pcap_conn_free(struct osmo_pcap_conn *conn)
 {
 	close_connection(conn);
 	llist_del(&conn->entry);

@@ -409,7 +409,7 @@ DEFUN(cfg_server_no_client,
 		return CMD_WARNING;
 	}
 
-	osmo_pcap_server_delete(conn);
+	osmo_pcap_conn_free(conn);
 	return CMD_SUCCESS;
 }
 

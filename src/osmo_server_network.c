@@ -504,7 +504,6 @@ struct osmo_pcap_conn *osmo_pcap_server_find(struct osmo_pcap_server *server,
 {
 	struct rate_ctr_group_desc *desc;
 	struct osmo_pcap_conn *conn;
-	size_t buf_size;
 
 	llist_for_each_entry(conn, &server->conn, entry) {
 		if (strcmp(conn->name, name) == 0)
@@ -518,10 +517,9 @@ struct osmo_pcap_conn *osmo_pcap_server_find(struct osmo_pcap_server *server,
 		return NULL;
 	}
 
-	buf_size = sizeof(struct osmo_pcap_data);
-	buf_size += OSMO_MAX(sizeof(struct pcap_file_header),
-			     sizeof(struct osmo_pcap_pkthdr) + server->max_snaplen);
-	conn->data = talloc_zero_size(conn, buf_size);
+	conn->data_max_len = OSMO_MAX(sizeof(struct pcap_file_header),
+				      sizeof(struct osmo_pcap_pkthdr) + server->max_snaplen);
+	conn->data = talloc_zero_size(conn, sizeof(struct osmo_pcap_data) + conn->data_max_len);
 	/* a bit nasty. we do not work with ids but names */
 	desc = talloc_zero(conn, struct rate_ctr_group_desc);
 	if (!desc) {

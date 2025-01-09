@@ -99,6 +99,7 @@ struct osmo_pcap_conn {
 	int pend;
 	bool reopen_delayed;
 	struct osmo_pcap_data *data;
+	size_t data_max_len; /* size of allocated buffer in data->data. */
 
 	/* statistics */
 	struct rate_ctr_group *ctrg;

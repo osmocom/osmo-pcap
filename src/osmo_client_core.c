@@ -303,6 +303,7 @@ struct osmo_pcap_client *osmo_pcap_client_alloc(void *tall_ctx)
 		return NULL;
 
 	client->snaplen = DEFAULT_SNAPLEN;
+	client->pcap_fmt = OSMO_PCAP_FMT_PCAP;
 	INIT_LLIST_HEAD(&client->handles);
 	INIT_LLIST_HEAD(&client->conns);
 

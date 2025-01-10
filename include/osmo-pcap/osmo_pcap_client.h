@@ -31,6 +31,7 @@
 #include <osmocom/core/write_queue.h>
 
 #include <osmo-pcap/osmo_tls.h>
+#include <osmo-pcap/osmo_pcap_file.h>
 
 #define WQUEUE_MAXLEN_DEFAULT 1000
 
@@ -115,6 +116,7 @@ struct osmo_pcap_client {
 	int filter_itself;
 	int gprs_filtering;
 	int snaplen;
+	enum osmo_pcap_fmt pcap_fmt;
 
 	struct osmo_pcap_client_conn *conn;
 	struct llist_head conns;

@@ -1,6 +1,7 @@
 /*
  * osmo-pcap-client code
  *
+ * (C) 2025 by sysmocom - s.f.m.c. GmbH <info@sysmocom.de>
  * (C) 2011-2016 by Holger Hans Peter Freyther <holger@moiji-mobile.com>
  * (C) 2011 by On-Waves
  * All Rights Reserved
@@ -130,6 +131,8 @@ static int config_write_client(struct vty *vty)
 
 	vty_out(vty, "client%s", VTY_NEWLINE);
 
+	if (pcap_client->pcap_fmt != OSMO_PCAP_FMT_PCAP)
+		vty_out(vty, " pcap file-format pcapng%s", VTY_NEWLINE);
 	llist_for_each_entry(ph, &pcap_client->handles, entry) {
 		vty_out(vty, " pcap device %s%s",
 			ph->devname, VTY_NEWLINE);
@@ -147,6 +150,22 @@ static int config_write_client(struct vty *vty)
 
 
 	write_client_conn_data(vty, pcap_client->conn, "");
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_client_pcap_file_format,
+      cfg_client_pcap_file_format_cmd,
+      "pcap file-format (pcap|pcapng)",
+      PCAP_STRING "The pcap file format to use\n"
+      "Libpcap Capture File Format (.pcap)\n"
+      "PCAP Next Generation Capture File Format (.pcapng)\n")
+{
+	if (strcmp(argv[0], "pcap") == 0)
+		pcap_client->pcap_fmt = OSMO_PCAP_FMT_PCAP;
+	else if (strcmp(argv[0], "pcapng") == 0)
+		pcap_client->pcap_fmt = OSMO_PCAP_FMT_PCAPNG;
+	else
+		return CMD_WARNING;
 	return CMD_SUCCESS;
 }
 
@@ -559,6 +578,7 @@ int vty_client_init(void)
 
 	install_node(&server_node, config_write_server);
 
+	install_element(CLIENT_NODE, &cfg_client_pcap_file_format_cmd);
 	install_element(CLIENT_NODE, &cfg_client_no_device_cmd);
 	install_element(CLIENT_NODE, &cfg_client_device_cmd);
 	install_element(CLIENT_NODE, &cfg_client_snaplen_cmd);

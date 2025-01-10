@@ -17,9 +17,9 @@ osmo_pcap_client_SOURCES = \
 	osmo_client_main.c \
 	osmo_common.c \
 	osmo_client_core.c \
-	osmo_client_vty.c \
 	osmo_client_network.c \
 	osmo_client_stats.c \
+	osmo_client_vty.c \
 	osmo_tls.c \
 	$(NULL)
 

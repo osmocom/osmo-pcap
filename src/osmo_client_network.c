@@ -187,6 +187,46 @@ static struct msgb *osmo_client_conn_prepare_msg_data_pcap(struct osmo_pcap_clie
 	return msg;
 }
 
+static struct msgb *osmo_client_conn_prepare_msg_data_pcapng(struct osmo_pcap_client_conn *conn,
+							     const struct osmo_pcap_handle *ph,
+							     const struct pcap_pkthdr *pkthdr,
+							     const uint8_t *data)
+{
+	struct osmo_pcap_data *om_hdr;
+	struct msgb *msg;
+	struct osmo_pcapng_file_epb_pars epb_pars;
+	unsigned int record_size;
+	int rc;
+
+	epb_pars = (struct osmo_pcapng_file_epb_pars){
+		.timestamp_usec = (pkthdr->ts.tv_sec * 1000 * 1000) + pkthdr->ts.tv_usec,
+		.interface_id = ph->idx,
+		.captured_data = data,
+		.captured_len = pkthdr->caplen,
+		.packet_len = pkthdr->len,
+	};
+
+	record_size = osmo_pcapng_file_epb_size(&epb_pars);
+
+	msg = msgb_alloc(sizeof(*om_hdr) + record_size, "pcap-data");
+	if (!msg) {
+		LOGCONN(conn, LOGL_ERROR, "Failed to allocate\n");
+		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_NOMEM);
+		return NULL;
+	}
+
+	om_hdr = (struct osmo_pcap_data *) msgb_put(msg, sizeof(*om_hdr));
+	om_hdr->type = PKT_LINK_DATA;
+	om_hdr->len = htons(record_size);
+	rc = osmo_pcapng_file_msgb_append_epb(msg, &epb_pars);
+	if (rc < 0) {
+		msgb_free(msg);
+		return NULL;
+	}
+
+	return msg;
+}
+
 static struct msgb *osmo_client_conn_prepare_msg_ipip(struct osmo_pcap_client_conn *conn,
 						      const struct osmo_pcap_handle *ph,
 						      const struct pcap_pkthdr *pkthdr,
@@ -231,7 +271,16 @@ void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
 
 	switch (conn->protocol) {
 	case PROTOCOL_OSMOPCAP:
-		msg = osmo_client_conn_prepare_msg_data_pcap(conn, ph, pkthdr, data);
+		switch (client->pcap_fmt) {
+		case OSMO_PCAP_FMT_PCAP:
+			msg = osmo_client_conn_prepare_msg_data_pcap(conn, ph, pkthdr, data);
+			break;
+		case OSMO_PCAP_FMT_PCAPNG:
+			msg = osmo_client_conn_prepare_msg_data_pcapng(conn, ph, pkthdr, data);
+			break;
+		default:
+			OSMO_ASSERT(0);
+		}
 		break;
 	case PROTOCOL_IPIP:
 		msg = osmo_client_conn_prepare_msg_ipip(conn, ph, pkthdr, data);
@@ -271,7 +320,7 @@ static struct msgb *osmo_client_conn_prepare_msg_link_pcap(struct osmo_pcap_clie
 		if (linktype != pcap_datalink(ph->handle)) {
 			LOGCONN(conn, LOGL_ERROR,
 				"File format 'pcap' doesn't support recording from multiple ifaces "
-				"with different link types!\n");
+				"with different link types! Use VTY config 'pcap file-format pcapng'.\n");
 			return NULL;
 		}
 	}
@@ -298,6 +347,81 @@ static struct msgb *osmo_client_conn_prepare_msg_link_pcap(struct osmo_pcap_clie
 	return msg;
 }
 
+struct osmo_pcapng_file_shb_pars shb_pars = {
+	.hardware = "osmo-pcap hw",
+	.os = "osmo-pcap os",
+	.userappl = "osmo-pcap userappl",
+};
+
+static int pcap_handle_prepare_pcapng_idb_pars(const struct osmo_pcap_handle *ph,
+					       struct osmo_pcapng_file_idb_pars *pars)
+{
+	struct osmo_pcap_client *client = ph->client;
+	memset(pars, 0, sizeof(*pars));
+
+	pars->name = ph->devname;
+	pars->filter = client->filter_string;
+	pars->link_type = pcap_datalink(ph->handle);
+	pars->snap_len = client->snaplen;
+	return 0;
+}
+
+static struct msgb *osmo_client_conn_prepare_msg_link_pcapng(struct osmo_pcap_client_conn *conn)
+{
+	struct osmo_pcap_data *om_hdr;
+	struct msgb *msg;
+	struct osmo_pcap_handle *ph;
+	int rc;
+	uint32_t file_hdr_size = osmo_pcapng_file_shb_size(&shb_pars);
+
+	/* Calculate size: */
+	llist_for_each_entry(ph, &conn->client->handles, entry) {
+		struct osmo_pcapng_file_idb_pars idb_pars;
+		if (pcap_handle_prepare_pcapng_idb_pars(ph, &idb_pars) < 0) {
+			LOGPH(ph, LOGL_ERROR, "Failed preparing pcapng IDB from handle\n");
+			return NULL;
+		}
+		file_hdr_size += osmo_pcapng_file_idb_size(&idb_pars);
+	}
+
+	msg = msgb_alloc(sizeof(*om_hdr) + file_hdr_size, "link-data");
+	if (!msg) {
+		LOGCONN(conn, LOGL_ERROR, "Failed to allocate data\n");
+		return NULL;
+	}
+
+	om_hdr = (struct osmo_pcap_data *)msgb_put(msg, sizeof(*om_hdr));
+	om_hdr->type = PKT_LINK_HDR;
+
+	rc = osmo_pcapng_file_msgb_append_shb(msg, &shb_pars);
+	if (rc < 0) {
+		LOGCONN(conn, LOGL_ERROR, "Failed to create pcapng SHB\n");
+		msgb_free(msg);
+		return NULL;
+	}
+	om_hdr->len = rc;
+
+	llist_for_each_entry(ph, &conn->client->handles, entry) {
+		struct osmo_pcapng_file_idb_pars idb_pars;
+		if (pcap_handle_prepare_pcapng_idb_pars(ph, &idb_pars) < 0) {
+			LOGPH(ph, LOGL_ERROR, "Failed preparing pcapng IDB from handle\n");
+			msgb_free(msg);
+			return NULL;
+		}
+		rc = osmo_pcapng_file_msgb_append_idb(msg, &idb_pars);
+		if (rc < 0) {
+			LOGPH(ph, LOGL_ERROR, "Failed to append pcapng IDB to msgb\n");
+			msgb_free(msg);
+			return NULL;
+		}
+		om_hdr->len += rc;
+	}
+
+	OSMO_ASSERT(om_hdr->len == file_hdr_size);
+	om_hdr->len = htons(om_hdr->len);
+	return msg;
+}
+
 void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 {
 	struct msgb *msg;
@@ -306,7 +430,17 @@ void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 	if (conn->protocol == PROTOCOL_IPIP)
 		return;
 
-	msg = osmo_client_conn_prepare_msg_link_pcap(conn);
+	switch (conn->client->pcap_fmt) {
+	case OSMO_PCAP_FMT_PCAP:
+		msg = osmo_client_conn_prepare_msg_link_pcap(conn);
+		break;
+	case OSMO_PCAP_FMT_PCAPNG:
+		msg = osmo_client_conn_prepare_msg_link_pcapng(conn);
+		break;
+	default:
+		OSMO_ASSERT(0);
+	}
+
 	if (!msg)
 		return;
 	write_data(conn, msg);

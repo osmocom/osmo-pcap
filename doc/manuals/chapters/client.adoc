@@ -44,15 +44,28 @@ in which the packet capturing is configured
 .osmo-pcap-client VTY configuration for packet capture
 ----
 client
- pcap device eth0 <1>
- pcap filter udp port 23000 <2>
- pcap detect-loop 1 <3>
+ pcap file-format pcapng <1>
+ pcap device eth0 <2>
+ pcap device eth2 <3>
+ pcap filter udp port 23000 <4>
+ pcap detect-loop 1 <5>
 ----
-<1> the network device from which to obtain a capture
-<2> the libpcap filter string (`udp port 23000` in this example)
-<3> instruct osmo-pcap-client to automatically add a filter that prevents capturing
-    the traffic between osmo-pcap-client and osmo-pcap-server, which would create a loop.
+<1> Prepare records in pcapng format.
+<2> The network device from which to obtain a capture.
+<3> Recording from multiple devices concurrently is supported.
+<4> The libpcap filter string (`udp port 23000` in this example).
+<5> Instruct osmo-pcap-client to automatically add a filter that prevents
+    capturing the traffic between osmo-pcap-client and osmo-pcap-server,
+    which would create a loop.
 
+Adding or removing new recording network devices during operation is not really
+supported, and a restart of osmo-pcap-client is expected for the new
+configuration to be properly set up.
+
+NOTE:: Recording from multiple network devices using old libpcap .pcap format is
+also supported, but since that file format doesn't allow storing per-interface
+information, it will end up stored in the server as if all came from the same
+interface.
 
 === Configuring the primary server
 

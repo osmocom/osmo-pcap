@@ -89,8 +89,8 @@ static void client_event(struct osmo_pcap_conn *conn,
 		pcap_zmq_send(conn->server->zmq_publ, data, strlen(data), 0);
 }
 
-static void client_data(struct osmo_pcap_conn *conn,
-				struct osmo_pcap_data *data)
+static void zmq_send_client_data(struct osmo_pcap_conn *conn,
+				 struct osmo_pcap_data *data)
 {
 	char *event_name;
 
@@ -101,7 +101,7 @@ static void client_data(struct osmo_pcap_conn *conn,
 	 * This multi-part support is insane... so if we lose the first
 	 * or the last part of the multipart message stuff is going out
 	 * of sync. *great* As we can't do anything about it right now
-	 * just close the eyese and send it.
+	 * just close the eyes and send it.
 	 */
 	event_name = talloc_asprintf(conn, "data.v1.%s", conn->name);
 	pcap_zmq_send(conn->server->zmq_publ, event_name, strlen(event_name), ZMQ_SNDMORE);
@@ -466,7 +466,7 @@ static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data
 	time_t now = time(NULL);
 	int rc;
 
-	client_data(conn, data);
+	zmq_send_client_data(conn, data);
 
 	if (!conn->store) {
 		update_last_write(conn, now);

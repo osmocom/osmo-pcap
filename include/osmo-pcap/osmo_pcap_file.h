@@ -29,6 +29,8 @@ enum osmo_pcap_fmt {
 	OSMO_PCAP_FMT_PCAPNG,
 };
 
+int osmo_pcap_file_discover_fmt(const uint8_t *data, size_t data_len, enum osmo_pcap_fmt *result_fmt);
+
 /***********************************************************
 * Libpcap File Format (.pcap)
 * https://wiki.wireshark.org/Development/LibpcapFileFormat
@@ -121,6 +123,11 @@ struct pcapng_enhanced_packet_block {
 	/* ... Padding ... */
 	/* ... Options ... */
 } __attribute__((packed));
+
+int osmo_pcapng_file_is_swapped(const uint8_t *data, size_t data_len);
+uint16_t osmo_pcapng_file_read_uint16(const uint8_t *data, bool endian_swapped);
+uint32_t osmo_pcapng_file_read_uint32(const uint8_t *data, bool endian_swapped);
+uint64_t osmo_pcapng_file_read_uint64(const uint8_t *data, bool endian_swapped);
 
 /* Helper APIs to encode blocks: */
 

@@ -29,6 +29,40 @@
 #include <osmo-pcap/common.h>
 #include <osmo-pcap/wireformat.h>
 
+/* Find out whether data contains a start of a .pcap or .pcapng file.
+ * Returns 0 on success, negative on error. */
+int osmo_pcap_file_discover_fmt(const uint8_t *data, size_t data_len, enum osmo_pcap_fmt *result_fmt)
+{
+	const struct pcapng_block_header *bh;
+	const struct pcapng_section_header_block *shb;
+
+	/* Check for .pcap: */
+	if (data_len >= sizeof(struct pcap_file_header) &&
+	    ((struct pcap_file_header *)data)->magic == OSMO_PCAP_FILE_MAGIC) {
+		*result_fmt = OSMO_PCAP_FMT_PCAP;
+		return 0;
+	}
+
+	/* Check for .pcapng: */
+	if (data_len < sizeof(struct pcapng_block_header) +
+		       sizeof(struct pcapng_section_header_block) +
+		       sizeof(uint32_t))
+		return -1;
+
+	bh = (const struct pcapng_block_header *)data;
+	/* BLOCK_TYPE_SHB has the same value regardless of byte order */
+	if (bh->block_type != BLOCK_TYPE_SHB)
+		return -1;
+
+	shb = (const struct pcapng_section_header_block *)&bh->block_body[0];
+	if (shb->magic != OSMO_PCAPNG_FILE_MAGIC &&
+	    shb->magic != OSMO_PCAPNG_FILE_MAGIC_SWAPPED)
+		return -2;
+
+	*result_fmt = OSMO_PCAP_FMT_PCAPNG;
+	return 0;
+}
+
 /***********************************************************
  * Libpcap File Format (.pcap)
  * https://wiki.wireshark.org/Development/LibpcapFileFormat
@@ -171,6 +205,64 @@ static int osmo_pcapng_file_msgb_append_opt_eofopt(struct msgb *msg)
 	opth->value_length = 0;
 
 	return sizeof(*opth);
+}
+
+static int osmo_pcapng_file_shb_is_swapped(const struct pcapng_section_header_block *shb)
+{
+	if (shb->magic == OSMO_PCAPNG_FILE_MAGIC_SWAPPED)
+		return 1;
+	if (shb->magic == OSMO_PCAPNG_FILE_MAGIC)
+		return 0;
+	return -1;
+}
+
+/* 1: true, 0: false, negative: error */
+int osmo_pcapng_file_is_swapped(const uint8_t *data, size_t data_len)
+{
+	const struct pcapng_block_header *bh = (const struct pcapng_block_header *)data;
+	const struct pcapng_section_header_block *shb;
+
+	if (data_len < sizeof(struct pcapng_block_header) +
+		       sizeof(struct pcapng_section_header_block) +
+		       sizeof(uint32_t))
+		return -1;
+
+	/* BLOCK_TYPE_SHB has the same value regardless of byte order */
+	if (bh->block_type != BLOCK_TYPE_SHB)
+		return -1;
+
+	shb = (const struct pcapng_section_header_block *)&bh->block_body[0];
+	return osmo_pcapng_file_shb_is_swapped(shb);
+}
+
+uint16_t osmo_pcapng_file_read_uint16(const uint8_t *data, bool endian_swapped)
+{
+	uint16_t val;
+
+	memcpy(&val, data, sizeof(val));
+	if (!endian_swapped)
+		return val;
+	return (val >> 8) | (val << 8);
+}
+
+uint32_t osmo_pcapng_file_read_uint32(const uint8_t *data, bool endian_swapped)
+{
+	uint32_t val;
+
+	memcpy(&val, data, sizeof(val));
+	if (!endian_swapped)
+		return val;
+	return __builtin_bswap32(val);
+}
+
+uint64_t osmo_pcapng_file_read_uint64(const uint8_t *data, bool endian_swapped)
+{
+	uint64_t val;
+
+	memcpy(&val, data, sizeof(val));
+	if (!endian_swapped)
+		return val;
+	return __builtin_bswap64(val);
 }
 
 /* Get required length to store a given record (packet) */

@@ -35,6 +35,7 @@ osmo_pcap_client_LDADD = \
 osmo_pcap_server_SOURCES = \
 	osmo_server_main.c \
 	osmo_common.c \
+	osmo_pcap_file.c \
 	osmo_server_vty.c \
 	osmo_server_network.c \
 	osmo_server_stats.c \

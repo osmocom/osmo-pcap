@@ -1,6 +1,7 @@
 /*
  * osmo-pcap-client code
  *
+ * (C) 2025 by sysmocom - s.f.m.c. GmbH <info@sysmocom.de>
  * (C) 2011-2016 by Holger Hans Peter Freyther <holger@moiji-mobile.com>
  * (C) 2011 by On-Waves
  * All Rights Reserved
@@ -23,7 +24,9 @@
 #include <osmo-pcap/osmo_pcap_client.h>
 #include <osmo-pcap/common.h>
 #include <osmo-pcap/wireformat.h>
+#include <osmo-pcap/osmo_pcap_file.h>
 
+#include <osmocom/core/utils.h>
 #include <osmocom/core/msgb.h>
 #include <osmocom/core/rate_ctr.h>
 #include <osmocom/core/select.h>
@@ -160,112 +163,152 @@ static int get_iphdr_offset(int dlt)
 	}
 }
 
-void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
-				struct pcap_pkthdr *in_hdr, const uint8_t *data)
+static struct msgb *osmo_client_conn_prepare_msg_data_pcap(struct osmo_pcap_client_conn *conn,
+							   const struct osmo_pcap_handle *ph,
+							   const struct pcap_pkthdr *pkthdr,
+							   const uint8_t *data)
 {
 	struct osmo_pcap_data *om_hdr;
-	struct osmo_pcap_pkthdr *hdr;
 	struct msgb *msg;
-	int offset, ip_len;
-	struct osmo_pcap_handle *ph;
+	unsigned int record_size = osmo_pcap_file_record_size(pkthdr);
 
-	if (in_hdr->len > in_hdr->caplen) {
-		LOGCONN(conn, LOGL_ERROR, "Recording truncated packet, len %zu > snaplen %zu\n",
-			(size_t) in_hdr->len, (size_t) in_hdr->caplen);
-		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_2BIG);
-	}
-
-	msg = msgb_alloc(in_hdr->caplen + sizeof(*om_hdr) + sizeof(*hdr), "data-data");
+	msg = msgb_alloc(sizeof(*om_hdr) + record_size, "pcap-data");
 	if (!msg) {
 		LOGCONN(conn, LOGL_ERROR, "Failed to allocate\n");
 		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_NOMEM);
-		return;
+		return NULL;
+	}
+
+	om_hdr = (struct osmo_pcap_data *) msgb_put(msg, sizeof(*om_hdr));
+	om_hdr->type = PKT_LINK_DATA;
+	om_hdr->len = htons(record_size);
+	osmo_pcap_file_msgb_append_record(msg, pkthdr, data);
+
+	return msg;
+}
+
+static struct msgb *osmo_client_conn_prepare_msg_ipip(struct osmo_pcap_client_conn *conn,
+						      const struct osmo_pcap_handle *ph,
+						      const struct pcap_pkthdr *pkthdr,
+						      const uint8_t *data)
+{
+	struct msgb *msg;
+	int offset, ip_len;
+
+	offset = get_iphdr_offset(pcap_datalink(ph->handle));
+	if (offset < 0)
+		return NULL;
+
+	ip_len = pkthdr->caplen - offset;
+	if (ip_len < 0)
+		return NULL;
+
+
+	msg = msgb_alloc(ip_len, "ipip_msg");
+	if (!msg) {
+		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate data.\n");
+		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_NOMEM);
+		return NULL;
+	}
+	msg->l2h = msgb_put(msg, ip_len);
+	memcpy(msg->l2h, data+offset, ip_len);
+	return msg;
+}
+
+void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
+				const struct osmo_pcap_handle *ph,
+				const struct pcap_pkthdr *pkthdr,
+				const uint8_t *data)
+{
+	struct osmo_pcap_client *client = conn->client;
+	struct msgb *msg;
+
+	if (pkthdr->len > pkthdr->caplen) {
+		LOGCONN(conn, LOGL_ERROR, "Recording truncated packet, len %zu > snaplen %zu\n",
+			(size_t) pkthdr->len, (size_t) pkthdr->caplen);
+		rate_ctr_inc2(client->ctrg, CLIENT_CTR_2BIG);
 	}
 
 	switch (conn->protocol) {
 	case PROTOCOL_OSMOPCAP:
-		om_hdr = (struct osmo_pcap_data *) msgb_put(msg, sizeof(*om_hdr));
-		om_hdr->type = PKT_LINK_DATA;
-
-		msg->l2h = msgb_put(msg, sizeof(*hdr));
-		hdr = (struct osmo_pcap_pkthdr *) msg->l2h;
-		hdr->ts_sec = in_hdr->ts.tv_sec;
-		hdr->ts_usec = in_hdr->ts.tv_usec;
-		hdr->caplen = in_hdr->caplen;
-		hdr->len = in_hdr->len;
-
-		msg->l3h = msgb_put(msg, in_hdr->caplen);
-		memcpy(msg->l3h, data, in_hdr->caplen);
-
-		om_hdr->len = htons(msgb_l2len(msg));
-		rate_ctr_add2(conn->client->ctrg, CLIENT_CTR_BYTES, hdr->caplen);
-		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_PKTS);
+		msg = osmo_client_conn_prepare_msg_data_pcap(conn, ph, pkthdr, data);
 		break;
 	case PROTOCOL_IPIP:
-		/* TODO: support capturing from multiple interfaces here: */
-		ph = llist_first_entry_or_null(&conn->client->handles, struct osmo_pcap_handle, entry);
-		if (!ph) {
-			msgb_free(msg);
-			return;
-		}
-		offset = get_iphdr_offset(pcap_datalink(ph->handle));
-		if (offset < 0) {
-			msgb_free(msg);
-			return;
-		}
-		ip_len = in_hdr->caplen - offset;
-		if (ip_len < 0) {
-			msgb_free(msg);
-			return;
-		}
-		msg->l2h = msgb_put(msg, ip_len);
-		memcpy(msg->l2h, data+offset, ip_len);
+		msg = osmo_client_conn_prepare_msg_ipip(conn, ph, pkthdr, data);
 		break;
 	default:
 		OSMO_ASSERT(0);
 	}
 
+	if (!msg)
+		return;
+
+	rate_ctr_add2(conn->client->ctrg, CLIENT_CTR_BYTES, pkthdr->caplen);
+	rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_PKTS);
+
 	write_data(conn, msg);
+}
+
+static struct msgb *osmo_client_conn_prepare_msg_link_pcap(struct osmo_pcap_client_conn *conn)
+{
+	struct osmo_pcap_client *client = conn->client;
+	struct osmo_pcap_data *om_hdr;
+	struct msgb *msg;
+	struct osmo_pcap_handle *ph;
+	int rc;
+	int linktype;
+
+	ph = llist_first_entry_or_null(&client->handles, struct osmo_pcap_handle, entry);
+	if (!ph || !ph->handle) {
+		LOGCONN(conn, LOGL_ERROR, "No pcap_handle not sending link info\n");
+		return NULL;
+	}
+	linktype = pcap_datalink(ph->handle);
+
+	/* Make sure others have same linktype, .pcap doesn't support different
+	 * linktypes since traffic from all ifaces goes mixed together. */
+	llist_for_each_entry(ph, &client->handles, entry) {
+		if (linktype != pcap_datalink(ph->handle)) {
+			LOGCONN(conn, LOGL_ERROR,
+				"File format 'pcap' doesn't support recording from multiple ifaces "
+				"with different link types!\n");
+			return NULL;
+		}
+	}
+
+	msg = msgb_alloc(sizeof(*om_hdr) + sizeof(struct pcap_file_header), "link-data");
+	if (!msg) {
+		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate data.\n");
+		return NULL;
+	}
+
+
+	om_hdr = (struct osmo_pcap_data *)msgb_put(msg, sizeof(*om_hdr));
+	om_hdr->type = PKT_LINK_HDR;
+
+	rc = osmo_pcap_file_msgb_append_global_header(msg, client->snaplen, linktype);
+	if (rc < 0) {
+		LOGP(DCLIENT, LOGL_ERROR, "Failed to create pcap file global header.\n");
+		msgb_free(msg);
+		return NULL;
+	}
+
+	/* Update payload length: */
+	om_hdr->len = htons(rc);
+	return msg;
 }
 
 void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 {
-	struct osmo_pcap_handle *ph;
-	struct pcap_file_header *hdr;
-	struct osmo_pcap_data *om_hdr;
 	struct msgb *msg;
 
 	/* IPIP encapsulation has no linktype header */
 	if (conn->protocol == PROTOCOL_IPIP)
 		return;
 
-	/* TODO: support capturing from multiple interfaces here: */
-	ph = llist_first_entry_or_null(&conn->client->handles, struct osmo_pcap_handle, entry);
-	if (!ph || !ph->handle) {
-		LOGCONN(conn, LOGL_ERROR, "No pcap_handle not sending link info\n");
+	msg = osmo_client_conn_prepare_msg_link_pcap(conn);
+	if (!msg)
 		return;
-	}
-
-	msg = msgb_alloc(sizeof(*om_hdr) + sizeof(*hdr), "link-data");
-	if (!msg) {
-		LOGP(DCLIENT, LOGL_ERROR, "Failed to allocate data.\n");
-		return;
-	}
-
-
-	om_hdr = (struct osmo_pcap_data *) msgb_put(msg, sizeof(*om_hdr));
-	om_hdr->type = PKT_LINK_HDR;
-	om_hdr->len = htons(sizeof(*hdr));
-
-	hdr = (struct pcap_file_header *) msgb_put(msg, sizeof(*hdr));
-	hdr->magic = 0xa1b2c3d4;
-	hdr->version_major = 2;
-	hdr->version_minor = 4;
-	hdr->thiszone = 0;
-	hdr->sigfigs = 0;
-	hdr->snaplen = conn->client->snaplen;
-	hdr->linktype = pcap_datalink(ph->handle);
-
 	write_data(conn, msg);
 }
 

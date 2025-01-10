@@ -172,7 +172,7 @@ static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 		return 0;
 
 	llist_for_each_entry(conn, &client->conns, entry)
-		osmo_client_conn_send_data(conn, &hdr, data);
+		osmo_client_conn_send_data(conn, ph, &hdr, data);
 	return 0;
 }
 

@@ -35,6 +35,7 @@
 
 #include <osmo-pcap/wireformat.h>
 #include <osmo-pcap/osmo_tls.h>
+#include <osmo-pcap/osmo_pcap_file.h>
 
 struct rate_ctr_group;
 struct rate_ctr_group_desc;
@@ -88,7 +89,10 @@ struct osmo_pcap_conn {
 	char *curr_filename;
 
 	/* pcap stuff */
-	struct pcap_file_header file_hdr;
+	enum osmo_pcap_fmt file_fmt;
+	bool pcapng_endian_swapped;
+	uint8_t *file_hdr;
+	uint32_t file_hdr_len;
 
 	/* last time */
 	struct tm last_write;

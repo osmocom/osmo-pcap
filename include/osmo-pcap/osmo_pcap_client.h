@@ -139,7 +139,9 @@ struct osmo_pcap_handle *osmo_client_find_handle(struct osmo_pcap_client *client
 struct osmo_pcap_client_conn *osmo_client_conn_alloc(struct osmo_pcap_client *client, const char *name);
 void osmo_client_conn_free(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_send_data(struct osmo_pcap_client_conn *conn,
-				struct pcap_pkthdr *hdr, const uint8_t *data);
+				const struct osmo_pcap_handle *ph,
+				const struct pcap_pkthdr *pkthdr,
+				const uint8_t *data);
 void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_disconnect(struct osmo_pcap_client_conn *conn);

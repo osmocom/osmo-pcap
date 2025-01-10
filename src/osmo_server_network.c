@@ -135,7 +135,7 @@ void move_completed_trace_if_needed(struct osmo_pcap_conn *conn)
 	if (!server->completed_path)
 		return;
 
-	/* Assumption: curr_filename is anonicalized absolute pathname. */
+	/* Assumption: curr_filename is canonical absolute pathname. */
 
 	/* basename and dirname may modify input param, and return a string
 	 * which shall not be freed, potentially pointing to the input param. */

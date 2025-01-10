@@ -21,21 +21,20 @@
  */
 #pragma once
 
-#include "wireformat.h"
-#include "osmo_tls.h"
-
-#include <osmocom/core/select.h>
-#include <osmocom/core/linuxlist.h>
-#include <osmocom/core/write_queue.h>
-
+#include <stdbool.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
 #include <pcap.h>
 
-#include <stdbool.h>
-#include <time.h>
+#include <osmocom/core/select.h>
+#include <osmocom/core/linuxlist.h>
+#include <osmocom/core/write_queue.h>
+
+#include <osmo-pcap/wireformat.h>
+#include <osmo-pcap/osmo_tls.h>
 
 struct rate_ctr_group;
 struct rate_ctr_group_desc;

@@ -21,8 +21,6 @@
  */
 #pragma once
 
-#include "osmo_tls.h"
-
 #include <inttypes.h>
 #include <pcap.h>
 
@@ -31,6 +29,8 @@
 #include <osmocom/core/timer.h>
 #include <osmocom/core/rate_ctr.h>
 #include <osmocom/core/write_queue.h>
+
+#include <osmo-pcap/osmo_tls.h>
 
 #define WQUEUE_MAXLEN_DEFAULT 1000
 

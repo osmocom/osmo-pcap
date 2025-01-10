@@ -21,7 +21,7 @@
  */
 #pragma once
 
-#include <inttypes.h>
+#include <stdint.h>
 #include <pcap.h>
 
 enum OsmoPcapDataType {

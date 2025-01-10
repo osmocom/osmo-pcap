@@ -20,11 +20,11 @@
  */
 #pragma once
 
-#include <gnutls/gnutls.h>
-#include <gnutls/abstract.h>
-
 #include <stdbool.h>
 #include <stdint.h>
+
+#include <gnutls/gnutls.h>
+#include <gnutls/abstract.h>
 
 struct osmo_fd;
 struct osmo_wqueue;

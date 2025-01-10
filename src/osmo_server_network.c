@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <libgen.h>
 
 static void pcap_zmq_send(void *publ, const void *data, size_t len, int flags)

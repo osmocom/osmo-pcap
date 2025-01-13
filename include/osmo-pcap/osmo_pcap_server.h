@@ -168,5 +168,9 @@ struct osmo_pcap_conn *osmo_pcap_server_find_or_create(struct osmo_pcap_server *
 					     const char *name);
 void osmo_pcap_conn_free(struct osmo_pcap_conn *conn);
 void vty_server_init(void);
-void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn);
 void osmo_pcap_conn_close(struct osmo_pcap_conn *conn);
+int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data, size_t len);
+void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn);
+void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn);
+void osmo_pcap_conn_event(struct osmo_pcap_conn *conn,
+			  const char *event, const char *data);

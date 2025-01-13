@@ -29,6 +29,7 @@ rotate_localtime_test_SOURCES = \
 
 rotate_localtime_test_LDADD = \
 	$(top_builddir)/src/osmo_pcap_file.o \
+	$(top_builddir)/src/osmo_server_core.o \
 	$(top_builddir)/src/osmo_server_network.o \
 	$(top_builddir)/src/osmo_server_stats.o \
 	$(top_builddir)/src/osmo_tls.o \

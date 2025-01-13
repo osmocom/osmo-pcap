@@ -87,6 +87,8 @@ struct osmo_pcap_conn {
 	int local_fd;
 	/* canonicalized absolute pathname of pcap file we write to */
 	char *curr_filename;
+	/* Current write offset of the file we write to (local_fd) */
+	off_t wr_offset;
 
 	/* pcap stuff */
 	enum osmo_pcap_fmt file_fmt;

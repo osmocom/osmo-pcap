@@ -308,12 +308,17 @@ ret_free1:
 	talloc_free(curr_filename_cpy_dname);
 }
 
+static void close_local_fd(struct osmo_pcap_conn *conn)
+{
+	close(conn->local_fd);
+	conn->local_fd = -1;
+	conn->wr_offset = 0;
+}
+
 void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn)
 {
-	if (conn->local_fd >= 0) {
-		close(conn->local_fd);
-		conn->local_fd = -1;
-	}
+	if (conn->local_fd >= 0)
+		close_local_fd(conn);
 
 	move_completed_trace_if_needed(conn);
 
@@ -342,7 +347,7 @@ void osmo_pcap_conn_close(struct osmo_pcap_conn *conn)
 /* Update conn->last_write if needed. This field is used to keep the last time
  * period where we wrote to the pcap file. Once a new write period (based on
  * rotation VTY config) is detected, the pcap file we write to is rotated. */
-static void update_last_write(struct osmo_pcap_conn *conn, time_t now)
+static void update_last_write(struct osmo_pcap_conn *conn, time_t now, size_t len)
 {
 	time_t last = mktime(&conn->last_write);
 
@@ -352,6 +357,8 @@ static void update_last_write(struct osmo_pcap_conn *conn, time_t now)
 	 * using the current one. */
 	if (now > last)
 		localtime_r(&now, &conn->last_write);
+
+	conn->wr_offset += len;
 }
 
 void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
@@ -365,7 +372,7 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 
 	/* omit any storing/creation of the file */
 	if (!conn->store) {
-		update_last_write(conn, now);
+		update_last_write(conn, now, 0);
 		talloc_free(conn->curr_filename);
 		conn->curr_filename = NULL;
 		return;
@@ -395,16 +402,15 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 		     conn->curr_filename, strerror(errno));
 		return;
 	}
+	conn->wr_offset = 0;
 
 	rc = write(conn->local_fd, conn->file_hdr, conn->file_hdr_len);
 	if (rc != conn->file_hdr_len) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to write the header: %d\n", errno);
-		close(conn->local_fd);
-		conn->local_fd = -1;
+		close_local_fd(conn);
 		return;
 	}
-
-	update_last_write(conn, now);
+	update_last_write(conn, now, rc);
 }
 
 void osmo_pcap_server_reopen(struct osmo_pcap_server *server)
@@ -425,13 +431,11 @@ void osmo_pcap_server_reopen(struct osmo_pcap_server *server)
 /* Returns true if pcap was re-opened */
 static bool check_restart_pcap_max_size(struct osmo_pcap_conn *conn, size_t data_len)
 {
-	off_t cur;
-
 	if (!pcap_server->max_size_enabled)
 		return false;
-	cur = lseek(conn->local_fd, 0, SEEK_CUR);
-	if (cur + data_len <= conn->server->max_size)
+	if (conn->wr_offset + data_len <= conn->server->max_size)
 		return false;
+
 	LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s (max-size)\n", conn->name);
 	osmo_pcap_conn_restart_trace(conn);
 	return true;
@@ -569,7 +573,7 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data
 	zmq_send_client_data(conn, data, len);
 
 	if (!conn->store) {
-		update_last_write(conn, now);
+		update_last_write(conn, now, 0);
 		return 0;
 	}
 
@@ -582,11 +586,11 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data
 	if (!check_restart_pcap_max_size(conn, len))
 		check_restart_pcap_localtime(conn, now);
 
-	update_last_write(conn, now);
 	rc = write(conn->local_fd, data, len);
 	if (rc != len) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to write for %s\n", conn->name);
 		return -1;
 	}
+	update_last_write(conn, now, rc);
 	return 0;
 }

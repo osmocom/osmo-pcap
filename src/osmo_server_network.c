@@ -462,13 +462,15 @@ static void new_connection(struct osmo_pcap_server *server,
 
 static int accept_cb(struct osmo_fd *fd, unsigned int when)
 {
-	struct osmo_pcap_conn *conn;
+	struct osmo_pcap_conn *conn = NULL;
 	struct osmo_pcap_server *server;
-	struct sockaddr_in addr;
-	socklen_t size = sizeof(addr);
+	char str[INET6_ADDRSTRLEN];
+	struct osmo_sockaddr osa;
+	socklen_t len = sizeof(osa.u.sas);
 	int new_fd;
 
-	new_fd = accept(fd->fd, (struct sockaddr *) &addr, &size);
+	memset(&osa, 0, sizeof(osa));
+	new_fd = accept(fd->fd, &osa.u.sa, &len);
 	if (new_fd < 0) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to accept socket: %d\n", errno);
 		return -1;
@@ -480,13 +482,20 @@ static int accept_cb(struct osmo_fd *fd, unsigned int when)
 	rate_ctr_inc2(server->ctrg, SERVER_CTR_CONNECT);
 
 	llist_for_each_entry(conn, &server->conn, entry) {
-		if (conn->remote_addr.s_addr == addr.sin_addr.s_addr) {
-			LOGP(DSERVER, LOGL_NOTICE,
-			     "New connection from %s\n", conn->name);
-			osmo_pcap_conn_event(conn, "connect", NULL);
-			new_connection(server, conn, new_fd);
-			return 0;
-		}
+		if (conn->rem_addr.u.sa.sa_family != osa.u.sa.sa_family)
+			continue;
+		switch (conn->rem_addr.u.sa.sa_family) {
+		case AF_INET:
+			if (conn->rem_addr.u.sin.sin_addr.s_addr != osa.u.sin.sin_addr.s_addr)
+				continue;
+			goto found;
+		case AF_INET6:
+			if (memcmp(&conn->rem_addr.u.sin6.sin6_addr, &osa.u.sin6.sin6_addr, sizeof(struct in6_addr)))
+				continue;
+			goto found;
+		default:
+			continue;
+		};
 	}
 
 	rate_ctr_inc2(server->ctrg, SERVER_CTR_NOCLIENT);
@@ -496,10 +505,16 @@ static int accept_cb(struct osmo_fd *fd, unsigned int when)
 	 * this client.
 	 */
 
-	LOGP(DSERVER, LOGL_ERROR,
-	     "Failed to find client for %s\n", inet_ntoa(addr.sin_addr));
+	LOGP(DSERVER, LOGL_ERROR, "Failed to find client for %s\n",
+	     osmo_sockaddr_ntop(&osa.u.sa, str));
 	close(new_fd);
 	return -1;
+
+found:
+	LOGP(DSERVER, LOGL_NOTICE, "New connection from %s\n", conn->name);
+	osmo_pcap_conn_event(conn, "connect", NULL);
+	new_connection(server, conn, new_fd);
+	return 0;
 }
 
 int osmo_pcap_server_listen(struct osmo_pcap_server *server)

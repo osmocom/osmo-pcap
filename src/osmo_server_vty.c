@@ -360,9 +360,11 @@ static int manage_client(struct osmo_pcap_server *pcap_server,
 		return CMD_WARNING;
 	}
 
-	talloc_free(conn->remote_host);
-	conn->remote_host = talloc_strdup(pcap_server, remote_host);
-	inet_aton(remote_host, &conn->remote_addr);
+	if (osmo_sockaddr_from_str_and_uint(&conn->rem_addr, remote_host, 0) < 0) {
+		vty_out(vty, "Failed parsing address\n");
+		return CMD_WARNING;
+	}
+	osmo_talloc_replace_string(pcap_server, &conn->remote_host, remote_host);
 
 	/* Checking store and maybe closing a pcap file */
 	if (!store)

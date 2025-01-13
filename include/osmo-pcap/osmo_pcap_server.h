@@ -32,6 +32,7 @@
 #include <osmocom/core/select.h>
 #include <osmocom/core/linuxlist.h>
 #include <osmocom/core/write_queue.h>
+#include <osmocom/core/socket.h>
 
 #include <osmo-pcap/wireformat.h>
 #include <osmo-pcap/osmo_tls.h>
@@ -80,7 +81,7 @@ struct osmo_pcap_conn {
 	char *name;
 	char *remote_host;
 	bool store;
-	struct in_addr remote_addr;
+	struct osmo_sockaddr rem_addr;
 
 	/* Remote connection */
 	struct osmo_wqueue rem_wq;

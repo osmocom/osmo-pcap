@@ -372,7 +372,7 @@ static int manage_client(struct osmo_pcap_server *pcap_server,
 	if (use_tls) {
 		/* force moving to TLS */
 		if (!conn->tls_use)
-			osmo_pcap_server_close_conn(conn);
+			osmo_pcap_conn_close(conn);
 		conn->tls_use = true;
 	} else {
 		conn->tls_use = false;

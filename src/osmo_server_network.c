@@ -212,7 +212,7 @@ void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn)
 	}
 }
 
-static void close_connection(struct osmo_pcap_conn *conn)
+void osmo_pcap_conn_close(struct osmo_pcap_conn *conn)
 {
 	if (conn->rem_wq.bfd.fd >= 0) {
 		osmo_fd_unregister(&conn->rem_wq.bfd);
@@ -223,11 +223,6 @@ static void close_connection(struct osmo_pcap_conn *conn)
 
 	osmo_pcap_conn_close_trace(conn);
 	client_event(conn, "disconnect", NULL);
-}
-
-void osmo_pcap_server_close_conn(struct osmo_pcap_conn *conn)
-{
-	return close_connection(conn);
 }
 
 /* Update conn->last_write if needed. This field is used to keep the last time
@@ -668,7 +663,7 @@ static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data
 
 void osmo_pcap_conn_free(struct osmo_pcap_conn *conn)
 {
-	close_connection(conn);
+	osmo_pcap_conn_close(conn);
 	llist_del(&conn->entry);
 	talloc_free(conn);
 }
@@ -903,7 +898,7 @@ static int read_cb(struct osmo_fd *fd)
 	conn = fd->data;
 	rc = dispatch_read(conn);
 	if (rc <= 0)
-		close_connection(conn);
+		osmo_pcap_conn_close(conn);
 	return 0;
 }
 
@@ -911,7 +906,7 @@ static void tls_error_cb(struct osmo_tls_session *session)
 {
 	struct osmo_pcap_conn *conn;
 	conn = container_of(session, struct osmo_pcap_conn, tls_session);
-	close_connection(conn);
+	osmo_pcap_conn_close(conn);
 }
 
 static int tls_read_cb(struct osmo_tls_session *session)
@@ -946,7 +941,7 @@ static int tls_read_cb(struct osmo_tls_session *session)
 static void new_connection(struct osmo_pcap_server *server,
 			   struct osmo_pcap_conn *client, int new_fd)
 {
-	close_connection(client);
+	osmo_pcap_conn_close(client);
 
 	TALLOC_FREE(client->file_hdr);
 	client->file_hdr_len = 0;
@@ -968,11 +963,11 @@ static void new_connection(struct osmo_pcap_server *server,
 		LOGP(DSERVER, LOGL_NOTICE,
 			"Require TLS but not enabled on conn=%s\n",
 			client->name);
-		close_connection(client);
+		osmo_pcap_conn_close(client);
 		return;
 	} else if (client->tls_use) {
 		if (!osmo_tls_init_server_session(client, server)) {
-			close_connection(client);
+			osmo_pcap_conn_close(client);
 			return;
 		}
 		client->tls_session.error = tls_error_cb;

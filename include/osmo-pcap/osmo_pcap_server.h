@@ -169,4 +169,4 @@ struct osmo_pcap_conn *osmo_pcap_server_find_or_create(struct osmo_pcap_server *
 void osmo_pcap_conn_free(struct osmo_pcap_conn *conn);
 void vty_server_init(void);
 void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn);
-void osmo_pcap_server_close_conn(struct osmo_pcap_conn *conn);
+void osmo_pcap_conn_close(struct osmo_pcap_conn *conn);

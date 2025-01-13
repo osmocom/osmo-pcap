@@ -116,6 +116,15 @@ struct osmo_pcap_conn {
 	struct osmo_tls_session tls_session;
 };
 
+void osmo_pcap_conn_free(struct osmo_pcap_conn *conn);
+void vty_server_init(void);
+void osmo_pcap_conn_close(struct osmo_pcap_conn *conn);
+int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data, size_t len);
+void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn);
+void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn);
+void osmo_pcap_conn_event(struct osmo_pcap_conn *conn,
+			  const char *event, const char *data);
+
 struct osmo_pcap_server {
 	struct llist_head conn;
 
@@ -163,16 +172,9 @@ struct osmo_pcap_server {
 extern struct osmo_pcap_server *pcap_server;
 extern const struct rate_ctr_group_desc pcap_peer_group_desc;
 extern const struct rate_ctr_group_desc pcap_server_group_desc;
+struct osmo_pcap_server *osmo_pcap_server_alloc(void *ctx);
 
 void osmo_pcap_server_reopen(struct osmo_pcap_server *server);
 int osmo_pcap_server_listen(struct osmo_pcap_server *server);
 struct osmo_pcap_conn *osmo_pcap_server_find_or_create(struct osmo_pcap_server *ser,
 					     const char *name);
-void osmo_pcap_conn_free(struct osmo_pcap_conn *conn);
-void vty_server_init(void);
-void osmo_pcap_conn_close(struct osmo_pcap_conn *conn);
-int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data, size_t len);
-void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn);
-void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn);
-void osmo_pcap_conn_event(struct osmo_pcap_conn *conn,
-			  const char *event, const char *data);

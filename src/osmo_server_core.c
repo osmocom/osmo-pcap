@@ -594,3 +594,25 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data
 	update_last_write(conn, now, rc);
 	return 0;
 }
+
+struct osmo_pcap_server *osmo_pcap_server_alloc(void *ctx)
+{
+	struct osmo_pcap_server *psrv = talloc_zero(ctx, struct osmo_pcap_server);
+	OSMO_ASSERT(psrv);
+
+	psrv->ctrg = rate_ctr_group_alloc(psrv, &pcap_server_group_desc, 0);
+	OSMO_ASSERT(psrv->ctrg);
+
+	INIT_LLIST_HEAD(&psrv->conn);
+	psrv->base_path = talloc_strdup(psrv, "./");
+	OSMO_ASSERT(psrv->base_path);
+	psrv->permission_mask = 0440;
+	psrv->max_size = 1073741824; /* 1024^3, 1GB **/
+	psrv->max_size_enabled = true;
+	psrv->max_snaplen = DEFAULT_SNAPLEN;
+	/* By default rotate daily: */
+	psrv->rotate_localtime.enabled = true;
+	psrv->rotate_localtime.intv = TIME_INTERVAL_DAY;
+	psrv->rotate_localtime.modulus = 1;
+	return psrv;
+}

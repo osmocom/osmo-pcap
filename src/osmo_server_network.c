@@ -194,7 +194,7 @@ ret_free1:
 	talloc_free(curr_filename_cpy_dname);
 }
 
-void osmo_pcap_server_close_trace(struct osmo_pcap_conn *conn)
+void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn)
 {
 	if (conn->local_fd >= 0) {
 		close(conn->local_fd);
@@ -221,7 +221,7 @@ static void close_connection(struct osmo_pcap_conn *conn)
 		osmo_tls_release(&conn->tls_session);
 	}
 
-	osmo_pcap_server_close_trace(conn);
+	osmo_pcap_conn_close_trace(conn);
 	client_event(conn, "disconnect", NULL);
 }
 
@@ -252,7 +252,7 @@ static void restart_pcap(struct osmo_pcap_conn *conn)
 	int rc;
 	char *real_base_path;
 
-	osmo_pcap_server_close_trace(conn);
+	osmo_pcap_conn_close_trace(conn);
 
 	/* omit any storing/creation of the file */
 	if (!conn->store) {

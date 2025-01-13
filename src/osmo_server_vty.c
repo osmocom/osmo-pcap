@@ -366,7 +366,7 @@ static int manage_client(struct osmo_pcap_server *pcap_server,
 
 	/* Checking store and maybe closing a pcap file */
 	if (!store)
-		osmo_pcap_server_close_trace(conn);
+		osmo_pcap_conn_close_trace(conn);
 	conn->store = store;
 
 	if (use_tls) {

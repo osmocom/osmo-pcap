@@ -170,7 +170,7 @@ void osmo_tls_init(void)
 	int rc;
 	rc = gnutls_global_init();
 	CHECK_RC(rc, "init failed");
-        gnutls_global_set_log_function(tls_log_func);
+	gnutls_global_set_log_function(tls_log_func);
 }
 
 void osmo_tls_server_init(struct osmo_pcap_server *server)
@@ -483,7 +483,7 @@ bool osmo_tls_init_client_session(struct osmo_pcap_client_conn *client)
 	sess->anon_alloc = true;
 
 	/* x509 certificate handling */
-        rc = gnutls_certificate_allocate_credentials(&sess->cert_cred);
+	rc = gnutls_certificate_allocate_credentials(&sess->cert_cred);
 	if (rc != GNUTLS_E_SUCCESS) {
 		LOGP(DTLS, LOGL_ERROR, "Failed to allocate x509 cred rc=%d\n", rc);
 		osmo_tls_release(sess);

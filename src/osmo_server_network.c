@@ -119,7 +119,7 @@ static int validate_link_hdr(const struct osmo_pcap_conn *conn, const struct osm
 }
 
 /* returns >0 on success, <= 0 on failure (closes conn) */
-static int rx_link_hdr(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
+static int rx_link_hdr(struct osmo_pcap_conn *conn, const struct osmo_pcap_data *data)
 {
 	int rc;
 
@@ -241,7 +241,7 @@ static int validate_link_data(const struct osmo_pcap_conn *conn, const struct os
 }
 
 /* returns >0 on success, <= 0 on failure (closes conn) */
-static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data)
+static int rx_link_data(struct osmo_pcap_conn *conn, const struct osmo_pcap_data *data)
 {
 	int rc;
 
@@ -251,6 +251,40 @@ static int rx_link_data(struct osmo_pcap_conn *conn, struct osmo_pcap_data *data
 	if ((rc = osmo_pcap_conn_process_data(conn, &data->data[0], data->len)))
 		return rc;
 	return 1;
+}
+
+/* Read segment payload, of size data->len.
+ * returns >0 on success, <= 0 on failure (closes conn) */
+static int rx_link(struct osmo_pcap_conn *conn, const struct osmo_pcap_data *data)
+{
+	int rc;
+
+	/* count the full packet we got */
+	rate_ctr_inc2(conn->ctrg, PEER_CTR_PKTS);
+	rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PKTS);
+
+	/* count the bytes of it */
+	rate_ctr_add2(conn->ctrg, PEER_CTR_BYTES, data->len);
+	rate_ctr_add2(conn->server->ctrg, SERVER_CTR_BYTES, data->len);
+
+	switch (data->type) {
+	case PKT_LINK_HDR:
+		rc = rx_link_hdr(conn, data);
+		break;
+	case PKT_LINK_DATA:
+		rc = rx_link_data(conn, data);
+		break;
+	default:
+		OSMO_ASSERT(0);
+	}
+
+	if (conn->reopen_delayed) {
+		LOGP(DSERVER, LOGL_INFO, "Reopening log for %s now.\n", conn->name);
+		osmo_pcap_conn_restart_trace(conn);
+		conn->reopen_delayed = false;
+	}
+
+	return rc;
 }
 
 static int do_read_tls(struct osmo_pcap_conn *conn, void *buf, size_t want_size)
@@ -328,32 +362,7 @@ static int read_cb_data(struct osmo_pcap_conn *conn)
 	conn->state = STATE_INITIAL;
 	conn->pend = sizeof(*conn->data);
 
-	/* count the full packet we got */
-	rate_ctr_inc2(conn->ctrg, PEER_CTR_PKTS);
-	rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PKTS);
-
-	/* count the bytes of it */
-	rate_ctr_add2(conn->ctrg, PEER_CTR_BYTES, conn->data->len);
-	rate_ctr_add2(conn->server->ctrg, SERVER_CTR_BYTES, conn->data->len);
-
-	switch (conn->data->type) {
-	case PKT_LINK_HDR:
-		rc = rx_link_hdr(conn, conn->data);
-		break;
-	case PKT_LINK_DATA:
-		rc = rx_link_data(conn, conn->data);
-		break;
-	default:
-		OSMO_ASSERT(0);
-	}
-
-	if (conn->reopen_delayed) {
-		LOGP(DSERVER, LOGL_INFO, "Reopening log for %s now.\n", conn->name);
-		osmo_pcap_conn_restart_trace(conn);
-		conn->reopen_delayed = false;
-	}
-
-	return rc;
+	return rx_link(conn, conn->data);
 }
 
 /* returns >0 on success, <= 0 on failure (closes conn) */

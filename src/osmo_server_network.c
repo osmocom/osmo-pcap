@@ -28,6 +28,7 @@
 #include <osmocom/core/socket.h>
 #include <osmocom/core/talloc.h>
 #include <osmocom/core/rate_ctr.h>
+#include <osmocom/core/utils.h>
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -124,8 +125,11 @@ static int rx_link_hdr(struct osmo_pcap_conn *conn, const struct osmo_pcap_data 
 	int rc;
 
 	rc = osmo_pcap_file_discover_fmt(data->data, data->len, &conn->file_fmt);
-	if (rc < 0)
+	if (rc < 0) {
+		LOGP(DSERVER, LOGL_ERROR, "Unable to figure out pcap vs pcapng file format (len=%u): %s\n",
+		     data->len, osmo_hexdump(data->data, OSMO_MIN(data->len, 32)));
 		return rc;
+	}
 
 	if (conn->file_fmt == OSMO_PCAP_FMT_PCAPNG) {
 		rc = osmo_pcapng_file_is_swapped(data->data, data->len);

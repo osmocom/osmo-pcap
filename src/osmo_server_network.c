@@ -471,23 +471,21 @@ static void new_connection(struct osmo_pcap_server *server,
 	}
 }
 
-static int accept_cb(struct osmo_fd *fd, unsigned int when)
+static int accept_cb(struct osmo_stream_srv_link *link, int fd)
 {
 	struct osmo_pcap_conn *conn = NULL;
-	struct osmo_pcap_server *server;
+	struct osmo_pcap_server *server = osmo_stream_srv_link_get_data(link);
 	char str[INET6_ADDRSTRLEN];
 	struct osmo_sockaddr osa;
 	socklen_t len = sizeof(osa.u.sas);
-	int new_fd;
+	int rc;
 
 	memset(&osa, 0, sizeof(osa));
-	new_fd = accept(fd->fd, &osa.u.sa, &len);
-	if (new_fd < 0) {
-		LOGP(DSERVER, LOGL_ERROR, "Failed to accept socket: %d\n", errno);
+	rc = getpeername(fd, &osa.u.sa, &len);
+	if (rc < 0) {
+		LOGP(DSERVER, LOGL_ERROR, "getpeername() failed during accept(): %d\n", errno);
 		return -1;
 	}
-
-	server = fd->data;
 
 	/* count any accept to see no clients */
 	rate_ctr_inc2(server->ctrg, SERVER_CTR_CONNECT);
@@ -518,35 +516,23 @@ static int accept_cb(struct osmo_fd *fd, unsigned int when)
 
 	LOGP(DSERVER, LOGL_ERROR, "Failed to find client for %s\n",
 	     osmo_sockaddr_ntop(&osa.u.sa, str));
-	close(new_fd);
+	close(fd);
 	return -1;
 
 found:
 	LOGP(DSERVER, LOGL_NOTICE, "New connection from %s\n", conn->name);
 	osmo_pcap_conn_event(conn, "connect", NULL);
-	new_connection(server, conn, new_fd);
+	new_connection(server, conn, fd);
 	return 0;
 }
 
-int osmo_pcap_server_listen(struct osmo_pcap_server *server)
+int osmo_pcap_server_listen(struct osmo_pcap_server *psrv)
 {
-	int fd;
-
-	fd = osmo_sock_init(AF_INET, SOCK_STREAM, IPPROTO_TCP,
-			    server->addr, server->port, OSMO_SOCK_F_BIND);
-	if (fd < 0) {
+	osmo_stream_srv_link_set_addr(psrv->srv_link, psrv->addr);
+	osmo_stream_srv_link_set_port(psrv->srv_link, psrv->port);
+	osmo_stream_srv_link_set_accept_cb(psrv->srv_link, accept_cb);
+	if (osmo_stream_srv_link_open(psrv->srv_link)) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to create the server socket.\n");
-		return -1;
-	}
-
-	server->listen_fd.fd = fd;
-	server->listen_fd.when = OSMO_FD_READ;
-	server->listen_fd.cb = accept_cb;
-	server->listen_fd.data = server;
-
-	if (osmo_fd_register(&server->listen_fd) != 0) {
-		LOGP(DSERVER, LOGL_ERROR, "Failed to register the socket.\n");
-		close(fd);
 		return -1;
 	}
 

@@ -4,6 +4,7 @@ AM_CPPFLAGS = \
 
 AM_CFLAGS = \
 	-Wall \
+	$(LIBOSMONETIF_CFLAGS) \
 	$(LIBOSMOGSM_CFLAGS) \
 	$(LIBOSMOGB_CFLAGS) \
 	$(LIBOSMOVTY_CFLAGS) \
@@ -31,6 +32,7 @@ rotate_localtime_test_LDADD = \
 	$(top_builddir)/src/osmo_server_core.o \
 	$(top_builddir)/src/osmo_server_stats.o \
 	$(top_builddir)/src/osmo_tls.o \
+	$(LIBOSMONETIF_LIBS) \
 	$(LIBOSMOCORE_LIBS) \
 	$(LIBOSMOVTY_LIBS) \
 	$(LIBGNUTLS_LIBS) \

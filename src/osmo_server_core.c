@@ -619,6 +619,13 @@ struct osmo_pcap_server *osmo_pcap_server_alloc(void *ctx)
 	psrv->rotate_localtime.enabled = true;
 	psrv->rotate_localtime.intv = TIME_INTERVAL_DAY;
 	psrv->rotate_localtime.modulus = 1;
+
+	psrv->srv_link = osmo_stream_srv_link_create(psrv);
+	OSMO_ASSERT(psrv->srv_link);
+	osmo_stream_srv_link_set_name(psrv->srv_link, "tcp_server");
+	osmo_stream_srv_link_set_proto(psrv->srv_link, IPPROTO_TCP);
+	osmo_stream_srv_link_set_data(psrv->srv_link, psrv);
+	osmo_stream_srv_link_set_nodelay(psrv->srv_link, true);
 	return psrv;
 }
 
@@ -632,6 +639,7 @@ void osmo_pcap_server_free(struct osmo_pcap_server *psrv)
 	while ((conn = llist_first_entry_or_null(&psrv->conn, struct osmo_pcap_conn, entry)))
 		osmo_pcap_conn_free(conn);
 
+	osmo_stream_srv_link_destroy(psrv->srv_link);
 	rate_ctr_group_free(psrv->ctrg);
 	talloc_free(psrv);
 }

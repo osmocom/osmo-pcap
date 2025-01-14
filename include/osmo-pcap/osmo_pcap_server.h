@@ -33,6 +33,7 @@
 #include <osmocom/core/linuxlist.h>
 #include <osmocom/core/write_queue.h>
 #include <osmocom/core/socket.h>
+#include <osmocom/netif/stream.h>
 
 #include <osmo-pcap/wireformat.h>
 #include <osmo-pcap/osmo_tls.h>
@@ -131,7 +132,7 @@ struct osmo_pcap_server {
 
 	int port;
 	char *addr;
-	struct osmo_fd listen_fd;
+	struct osmo_stream_srv_link *srv_link;
 
 	/* zeromq handling */
 	int zmq_port;

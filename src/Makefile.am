@@ -1,5 +1,6 @@
 AM_CPPFLAGS = $(all_includes) -I$(top_srcdir)/include -I$(top_builddir)/
 AM_CFLAGS = -Wall \
+	$(LIBOSMONETIF_CFLAGS) \
 	$(LIBOSMOCORE_CFLAGS) \
 	$(LIBOSMOGSM_CFLAGS) \
 	$(LIBOSMOGB_CFLAGS) \
@@ -44,6 +45,7 @@ osmo_pcap_server_SOURCES = \
 	$(NULL)
 
 osmo_pcap_server_LDADD = \
+	$(LIBOSMONETIF_LIBS) \
 	$(LIBOSMOVTY_LIBS) \
 	$(LIBOSMOCORE_LIBS) \
 	$(LIBZMQ_LIBS) \

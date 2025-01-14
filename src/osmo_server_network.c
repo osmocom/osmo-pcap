@@ -25,6 +25,8 @@
 #include <osmo-pcap/common.h>
 #include <osmo-pcap/wireformat.h>
 
+#include <osmocom/core/byteswap.h>
+#include <osmocom/core/osmo_io.h>
 #include <osmocom/core/socket.h>
 #include <osmocom/core/talloc.h>
 #include <osmocom/core/rate_ctr.h>
@@ -299,20 +301,13 @@ static int do_read_tls(struct osmo_pcap_conn *conn, void *buf, size_t want_size)
 	return gnutls_record_recv(conn->tls_session.session, buf, size);
 }
 
-static int do_read(struct osmo_pcap_conn *conn, void *buf, size_t size)
-{
-	if (conn->direct_read)
-		return read(conn->rem_wq.bfd.fd, buf, size);
-	return do_read_tls(conn, buf, size);
-}
-
 /* Read segment header, struct osmo_pcap_data (without payload)
  * returns >0 on success, <= 0 on failure (closes conn) */
-static int read_cb_initial(struct osmo_pcap_conn *conn)
+static int tls_read_cb_initial(struct osmo_pcap_conn *conn)
 {
 	int rc;
 
-	rc = do_read(conn, ((uint8_t*)conn->data) + sizeof(*conn->data) - conn->pend, conn->pend);
+	rc = do_read_tls(conn, ((uint8_t *)conn->data) + sizeof(*conn->data) - conn->pend, conn->pend);
 	if (rc <= 0) {
 		LOGP(DSERVER, LOGL_ERROR,
 		     "Too short packet. Got %d, wanted %d\n", rc, conn->data->len);
@@ -341,13 +336,11 @@ static int read_cb_initial(struct osmo_pcap_conn *conn)
 	return 1;
 }
 
-/* Read segment payload, of size conn->data->len.
- * returns >0 on success, <= 0 on failure (closes conn) */
-static int read_cb_data(struct osmo_pcap_conn *conn)
+static int tls_read_cb_data(struct osmo_pcap_conn *conn)
 {
 	int rc;
 
-	rc = do_read(conn, &conn->data->data[conn->data->len - conn->pend], conn->pend);
+	rc = do_read_tls(conn, &conn->data->data[conn->data->len - conn->pend], conn->pend);
 	if (rc <= 0) {
 		LOGP(DSERVER, LOGL_ERROR,
 		     "Too short packet. Got %d, wanted %d\n", rc, conn->data->len);
@@ -370,26 +363,14 @@ static int read_cb_data(struct osmo_pcap_conn *conn)
 }
 
 /* returns >0 on success, <= 0 on failure (closes conn) */
-static int dispatch_read(struct osmo_pcap_conn *conn)
+static int tls_dispatch_read(struct osmo_pcap_conn *conn)
 {
 	if (conn->state == STATE_INITIAL) {
-		return read_cb_initial(conn);
+		return tls_read_cb_initial(conn);
 	} else if (conn->state == STATE_DATA) {
-		return read_cb_data(conn);
+		return tls_read_cb_data(conn);
 	}
 
-	return 0;
-}
-
-static int read_cb(struct osmo_fd *fd)
-{
-	struct osmo_pcap_conn *conn;
-	int rc;
-
-	conn = fd->data;
-	rc = dispatch_read(conn);
-	if (rc <= 0)
-		osmo_pcap_conn_close(conn);
 	return 0;
 }
 
@@ -408,7 +389,7 @@ static int tls_read_cb(struct osmo_tls_session *session)
 
 	conn = container_of(session, struct osmo_pcap_conn, tls_session);
 	conn->tls_limit_read = 0;
-	rc = dispatch_read(conn);
+	rc = tls_dispatch_read(conn);
 	if (rc <= 0)
 		return rc;
 
@@ -421,7 +402,7 @@ static int tls_read_cb(struct osmo_tls_session *session)
 	 */
 	while ((pend = osmo_tls_pending(session)) > 0) {
 		conn->tls_limit_read = pend;
-		rc = dispatch_read(conn);
+		rc = tls_dispatch_read(conn);
 		if (rc <= 0)
 			return rc;
 	}
@@ -429,45 +410,95 @@ static int tls_read_cb(struct osmo_tls_session *session)
 	return 1;
 }
 
-static void new_connection(struct osmo_pcap_server *server,
-			   struct osmo_pcap_conn *client, int new_fd)
+int conn_read_cb(struct osmo_stream_srv *srv, int res, struct msgb *msg)
 {
-	osmo_pcap_conn_close(client);
+	struct osmo_pcap_conn *conn = osmo_stream_srv_get_data(srv);
+	struct osmo_pcap_data *data;
+	int rc;
 
-	client->rem_wq.bfd.fd = new_fd;
-	if (osmo_fd_register(&client->rem_wq.bfd) != 0) {
-		LOGP(DSERVER, LOGL_ERROR, "Failed to register fd.\n");
-		client->rem_wq.bfd.fd = -1;
+	if (res <= 0) {
+		LOGP(DSERVER, LOGL_ERROR, "Read from conn failed: %d\n", res);
+		osmo_pcap_conn_close(conn);
+		return 0;
+	}
+
+	data = (struct osmo_pcap_data *)msgb_data(msg);
+	data->len = osmo_ntohs(data->len);
+
+	rc = rx_link(conn, data);
+	msgb_free(msg);
+	if (rc <= 0)
+		osmo_pcap_conn_close(conn);
+	return 0;
+}
+
+int conn_segmentation_cb2(struct osmo_stream_srv *srv, struct msgb *msg)
+{
+	struct osmo_pcap_conn *conn = osmo_stream_srv_get_data(srv);
+
+	const struct osmo_pcap_data *hh = (struct osmo_pcap_data *) msgb_data(msg);
+	size_t payload_len, total_len;
+	size_t available = msgb_length(msg) + msgb_tailroom(msg);
+
+	if (msgb_length(msg) < sizeof(*hh)) {
+		/* Haven't even read the entire header */
+		return -EAGAIN;
+	}
+	payload_len = osmo_ntohs(hh->len);
+	total_len = sizeof(*hh) + payload_len;
+
+	if (OSMO_UNLIKELY(total_len > conn->data_max_len)) {
+		LOGP(DSERVER, LOGL_ERROR, "Implausible data length: %zu > %zu (snaplen %u)\n",
+		     total_len, conn->data_max_len, conn->server->max_snaplen);
+		return -ENOBUFS;
+	}
+
+	if (OSMO_UNLIKELY(total_len > available)) {
+		LOGP(DSERVER, LOGL_ERROR,
+		     "Not enough space left in message buffer. Have %zu octets, but need %zu\n",
+		     available, total_len);
+		return -ENOBUFS;
+	}
+	return total_len;
+}
+
+static void new_connection(struct osmo_pcap_server *server,
+			   struct osmo_pcap_conn *conn, int new_fd)
+{
+	osmo_pcap_conn_close(conn);
+
+	rate_ctr_inc2(conn->ctrg, PEER_CTR_CONNECT);
+
+	if (conn->tls_use && !server->tls_on) {
+		LOGP(DSERVER, LOGL_NOTICE, "Require TLS but not enabled on conn=%s\n", conn->name);
 		close(new_fd);
 		return;
 	}
 
-	rate_ctr_inc2(client->ctrg, PEER_CTR_CONNECT);
-
-	/* Prepare for first read of segment header: */
-	client->state = STATE_INITIAL;
-	client->pend = sizeof(*client->data);
-
-	if (client->tls_use && !server->tls_on) {
-		LOGP(DSERVER, LOGL_NOTICE,
-			"Require TLS but not enabled on conn=%s\n",
-			client->name);
-		osmo_pcap_conn_close(client);
-		return;
-	} else if (client->tls_use) {
-		if (!osmo_tls_init_server_session(client, server)) {
-			osmo_pcap_conn_close(client);
+	if (conn->tls_use) {
+		conn->rem_wq.bfd.fd = new_fd;
+		if (osmo_fd_register(&conn->rem_wq.bfd) != 0) {
+			LOGP(DSERVER, LOGL_ERROR, "Failed to register fd.\n");
+			conn->rem_wq.bfd.fd = -1;
+			close(new_fd);
 			return;
 		}
-		client->tls_session.error = tls_error_cb;
-		client->tls_session.read = tls_read_cb;
-		client->direct_read = false;
+		/* Prepare for first read of segment header: */
+		conn->state = STATE_INITIAL;
+		conn->pend = sizeof(struct osmo_pcap_data);
+		if (!osmo_tls_init_server_session(conn, server)) {
+			osmo_pcap_conn_close(conn);
+			return;
+		}
+		conn->tls_session.error = tls_error_cb;
+		conn->tls_session.read = tls_read_cb;
 	} else {
-		client->rem_wq.bfd.cb = osmo_wqueue_bfd_cb;
-		client->rem_wq.bfd.data = client;
-		client->rem_wq.bfd.when = OSMO_FD_READ;
-		client->rem_wq.read_cb = read_cb;
-		client->direct_read = true;
+		osmo_stream_srv_link_set_msgb_alloc_info(server->srv_link, conn->data_max_len, 0);
+		conn->srv = osmo_stream_srv_create2(conn, server->srv_link, new_fd, conn);
+		OSMO_ASSERT(conn->srv);
+		osmo_stream_srv_set_name(conn->srv, "pcap_conn");
+		osmo_stream_srv_set_read_cb(conn->srv, conn_read_cb);
+		osmo_stream_srv_set_segmentation_cb2(conn->srv, conn_segmentation_cb2);
 	}
 }
 

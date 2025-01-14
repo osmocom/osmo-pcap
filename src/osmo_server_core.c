@@ -336,6 +336,12 @@ void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn)
 
 void osmo_pcap_conn_close(struct osmo_pcap_conn *conn)
 {
+	/* No TLS: */
+	if (conn->srv) {
+		osmo_stream_srv_destroy(conn->srv);
+		conn->srv = NULL;
+	}
+	/* TLS: */
 	if (conn->rem_wq.bfd.fd >= 0) {
 		osmo_fd_unregister(&conn->rem_wq.bfd);
 		close(conn->rem_wq.bfd.fd);

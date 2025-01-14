@@ -85,10 +85,11 @@ struct osmo_pcap_conn {
 	struct osmo_sockaddr rem_addr;
 
 	/* Remote connection */
-	struct osmo_wqueue rem_wq;
-	int local_fd;
+	struct osmo_stream_srv *srv;
 	/* canonicalized absolute pathname of pcap file we write to */
 	char *curr_filename;
+	/* file descriptor of the file we write to */
+	int local_fd;
 	/* Current write offset of the file we write to (local_fd) */
 	off_t wr_offset;
 
@@ -105,7 +106,6 @@ struct osmo_pcap_conn {
 	int state;
 	int pend;
 	bool reopen_delayed;
-	struct osmo_pcap_data *data;
 	size_t data_max_len; /* size of allocated buffer in data->data. */
 
 	/* statistics */
@@ -113,9 +113,10 @@ struct osmo_pcap_conn {
 
 	/* tls */
 	bool tls_use;
-	bool direct_read;
 	size_t tls_limit_read;
 	struct osmo_tls_session tls_session;
+	struct osmo_wqueue rem_wq;
+	struct osmo_pcap_data *data; /* Used to store TLS decoded data */
 };
 
 void osmo_pcap_conn_free(struct osmo_pcap_conn *conn);

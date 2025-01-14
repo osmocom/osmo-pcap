@@ -339,6 +339,8 @@ void osmo_pcap_conn_close(struct osmo_pcap_conn *conn)
 		conn->rem_wq.bfd.fd = -1;
 		osmo_tls_release(&conn->tls_session);
 	}
+	TALLOC_FREE(conn->file_hdr);
+	conn->file_hdr_len = 0;
 
 	osmo_pcap_conn_close_trace(conn);
 	osmo_pcap_conn_event(conn, "disconnect", NULL);

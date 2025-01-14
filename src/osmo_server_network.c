@@ -421,8 +421,6 @@ static void new_connection(struct osmo_pcap_server *server,
 {
 	osmo_pcap_conn_close(client);
 
-	TALLOC_FREE(client->file_hdr);
-	client->file_hdr_len = 0;
 	client->rem_wq.bfd.fd = new_fd;
 	if (osmo_fd_register(&client->rem_wq.bfd) != 0) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to register fd.\n");

@@ -429,6 +429,76 @@ static int tls_read_cb(struct osmo_tls_session *session)
 	return 1;
 }
 
+size_t data_offset; /* How many bytes were read into *data buffer */
+
+int conn_tls_read_cb(struct osmo_stream_srv *srv, int res, struct msgb *msg)
+{
+	struct osmo_pcap_conn *conn = osmo_stream_srv_get_data(srv);
+	struct osmo_tls_session *tls = &conn->tls_session;
+	size_t payload_len, total_len;
+	struct osmo_pcap_data *hh = conn->fata;
+
+	if (res <= 0) {
+		LOGP(DSERVER, LOGL_ERROR, "Read from conn failed: %d\n", res);
+		osmo_pcap_conn_close(conn);
+		return 0;
+	}
+
+	/* This will be read by tls_read_cb */
+	msgb_enqueue(&conn->tls_rx_queue, msg);
+
+	/* Are we still on TLS handshake? */
+	if (tls->need_handshake) {
+		rc = gnutls_handshake(tls->session);
+		if (rc == 0) {
+			tls->need_handshake = false;
+			//TODO:
+			//release_keys(tls_session);
+			/* Continue below */
+		} else if (rc == GNUTLS_E_AGAIN || rc == GNUTLS_E_INTERRUPTED) {
+			return 0; /* We need more data from socket? */
+		} else if (gnutls_error_is_fatal(rc)) {
+		}
+	}
+
+	/* Read decoded TLS. Start with header if we don't have it yet. */
+	if (conn->data_offset < sizeof(*hh)) {
+		rc = do_read_tls(conn, ((uint8_t *)hh) + conn->data_offset), sizeof(*hh) - conn->data_offset);
+		if (rc < 0) {
+			osmo_pcap_conn_close(conn);
+			return 0;
+		}
+		conn->data_offset += rc;
+		if (rc < (sizeof(*hh) - conn->data_offset))
+			return 0;
+	}
+	payload_len = osmo_ntohs(hh->len);
+	total_len = sizeof(*hh) + payload_len;
+
+	if (OSMO_UNLIKELY(total_len > conn->data_max_len)) {
+		LOGP(DSERVER, LOGL_ERROR, "Implausible data length: %u > %zu (snaplen %u)\n",
+		     total_len, conn->data_max_len, conn->server->max_snaplen);
+		return -ENOBUFS;
+	}
+
+
+	rc = do_read_tls(conn, ((uint8_t *)hh->data, total_len - conn->data_offset);
+	if (rc < 0) {
+		osmo_pcap_conn_close(conn);
+		return 0;
+	}
+	conn->data_offset += rc;
+	/* Wait to receive the complete frame: */
+	if (conn->data_offset < total_len)
+		return 0;
+
+	rc = rx_link(conn, data);
+	conn->data_offset = 0;
+	if (rc <= 0)
+		osmo_pcap_conn_close(conn);
+	return 0;
+}
+
 static void new_connection(struct osmo_pcap_server *server,
 			   struct osmo_pcap_conn *client, int new_fd)
 {

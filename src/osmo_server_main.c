@@ -271,5 +271,5 @@ int main(int argc, char **argv)
 		osmo_select_main(0);
 	}
 
-	return(0);
+	return 0;
 }

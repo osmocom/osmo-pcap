@@ -174,7 +174,7 @@ extern struct osmo_pcap_server *pcap_server;
 extern const struct rate_ctr_group_desc pcap_peer_group_desc;
 extern const struct rate_ctr_group_desc pcap_server_group_desc;
 struct osmo_pcap_server *osmo_pcap_server_alloc(void *ctx);
-
+void osmo_pcap_server_free(struct osmo_pcap_server *psrv);
 void osmo_pcap_server_reopen(struct osmo_pcap_server *server);
 int osmo_pcap_server_listen(struct osmo_pcap_server *server);
 struct osmo_pcap_conn *osmo_pcap_server_find_or_create(struct osmo_pcap_server *ser,

@@ -271,5 +271,6 @@ int main(int argc, char **argv)
 		osmo_select_main(0);
 	}
 
+	osmo_pcap_server_free(pcap_server);
 	return 0;
 }

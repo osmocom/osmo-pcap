@@ -618,3 +618,17 @@ struct osmo_pcap_server *osmo_pcap_server_alloc(void *ctx)
 	psrv->rotate_localtime.modulus = 1;
 	return psrv;
 }
+
+void osmo_pcap_server_free(struct osmo_pcap_server *psrv)
+{
+	struct osmo_pcap_conn *conn;
+
+	if (!psrv)
+		return;
+
+	while ((conn = llist_first_entry_or_null(&psrv->conn, struct osmo_pcap_conn, entry)))
+		osmo_pcap_conn_free(conn);
+
+	rate_ctr_group_free(psrv->ctrg);
+	talloc_free(psrv);
+}

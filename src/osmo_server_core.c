@@ -149,6 +149,9 @@ static inline size_t calc_data_max_len(const struct osmo_pcap_server *server)
 					  pcapng_max_len_opt +
 					  sizeof(uint32_t);
 	data_max_len = OSMO_MAX(data_max_len, pcapng_epb_max_len + server->max_snaplen);
+
+	/* We are limited by (struct osmo_pcap_data)->len and msgb->len being uint16: */
+	data_max_len = OSMO_MIN(data_max_len, UINT16_MAX);
 	return data_max_len;
 }
 

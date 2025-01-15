@@ -146,7 +146,7 @@ static int rx_link_hdr(struct osmo_pcap_conn *conn, const struct osmo_pcap_data 
 	if ((rc = validate_link_hdr(conn, data)) < 0)
 		return rc;
 
-	if (conn->store && conn->local_fd < 0) {
+	if (conn->store && !conn->wrf) {
 		/* First received link hdr in conn */
 		talloc_free(conn->file_hdr);
 		conn->file_hdr = talloc_size(conn, data->len);

@@ -41,6 +41,7 @@ osmo_pcap_server_SOURCES = \
 	osmo_server_network.c \
 	osmo_server_stats.c \
 	osmo_server_vty.c \
+	osmo_pcap_wr_file.c \
 	osmo_tls.c \
 	$(NULL)
 

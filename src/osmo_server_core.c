@@ -207,7 +207,6 @@ static struct osmo_pcap_conn *osmo_pcap_conn_alloc(struct osmo_pcap_server *serv
 	/* we never write */
 	osmo_wqueue_init(&conn->rem_wq, 0);
 	conn->rem_wq.bfd.fd = -1;
-	conn->local_fd = -1;
 	conn->server = server;
 	llist_add_tail(&conn->entry, &server->conn);
 	return conn;
@@ -233,105 +232,22 @@ void osmo_pcap_conn_free(struct osmo_pcap_conn *conn)
 	talloc_free(conn);
 }
 
-/* Move pcap file from base_path to completed_path, and updates
- * conn->curr_filename to point to new location. */
-void move_completed_trace_if_needed(struct osmo_pcap_conn *conn)
-{
-	struct osmo_pcap_server *server = conn->server;
-	char *curr_filename_cpy_bname = NULL;
-	char *curr_filename_cpy_dname = NULL;
-	char *bname = NULL;
-	char *curr_dirname = NULL;
-	char *new_dirname = NULL;
-	char *new_filename = NULL;
-	size_t new_filename_len;
-	int rc;
-
-	if (!conn->curr_filename)
-		return;
-
-	if (!server->completed_path)
-		return;
-
-	/* Assumption: curr_filename is canonical absolute pathname. */
-
-	/* basename and dirname may modify input param, and return a string
-	 * which shall not be freed, potentially pointing to the input param. */
-	curr_filename_cpy_dname = talloc_strdup(conn, conn->curr_filename);
-	curr_filename_cpy_bname = talloc_strdup(conn, conn->curr_filename);
-	if (!curr_filename_cpy_dname || !curr_filename_cpy_bname)
-		goto ret_free1;
-
-	curr_dirname = dirname(curr_filename_cpy_dname);
-	bname = basename(curr_filename_cpy_bname);
-	if (!curr_dirname || !bname) {
-		LOGP(DSERVER, LOGL_ERROR, "Failed to resolve dirname and basename for '%s'\n",
-		     conn->curr_filename);
-		goto ret_free1;
-	}
-
-	new_dirname = realpath(server->completed_path, NULL);
-	if (!new_dirname) {
-		LOGP(DSERVER, LOGL_ERROR, "Failed to resolve path '%s': %s\n",
-		     server->completed_path, strerror(errno));
-		goto ret_free1;
-	}
-
-	new_filename_len = strlen(new_dirname) + 1 /* '/' */ + strlen(bname) + 1 /* '\0' */;
-	new_filename = talloc_size(conn, new_filename_len);
-	if (!new_filename)
-		goto ret_free1;
-	rc = snprintf(new_filename, new_filename_len, "%s/%s", new_dirname, bname);
-	if (rc != new_filename_len - 1)
-		goto ret_free2;
-
-	LOGP(DSERVER, LOGL_INFO, "Moving completed pcap file '%s' -> '%s'\n", conn->curr_filename, new_filename);
-	rc = rename(conn->curr_filename, new_filename);
-	if (rc == -1) {
-		int err = errno;
-		LOGP(DSERVER, LOGL_ERROR, "Failed moving completed pcap file '%s' -> '%s': %s\n",
-		     conn->curr_filename, new_filename, strerror(err));
-		if (err == EXDEV)
-			LOGP(DSERVER, LOGL_ERROR, "Fix your config! %s and %s shall not be in different filesystems!\n",
-			     curr_dirname, new_dirname);
-		goto ret_free2;
-	}
-
-	/* Now replace conn->curr_filename with new path: */
-	talloc_free(conn->curr_filename);
-	conn->curr_filename = new_filename;
-	/* new_filename has been assigned, so we don't want to free it, hence move to ret_free1: */
-	goto ret_free1;
-
-ret_free2:
-	talloc_free(new_filename);
-ret_free1:
-	free(new_dirname);
-	talloc_free(curr_filename_cpy_bname);
-	talloc_free(curr_filename_cpy_dname);
-}
-
-static void close_local_fd(struct osmo_pcap_conn *conn)
-{
-	close(conn->local_fd);
-	conn->local_fd = -1;
-	conn->wr_offset = 0;
-}
-
 void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn)
 {
-	if (conn->local_fd >= 0)
-		close_local_fd(conn);
+	if (!conn->wrf)
+		return;
 
-	move_completed_trace_if_needed(conn);
+	osmo_pcap_wr_file_close(conn->wrf);
 
-	if (conn->curr_filename) {
-		osmo_pcap_conn_event(conn, "closingtracefile", conn->curr_filename);
-		rate_ctr_inc2(conn->ctrg, PEER_CTR_PROTATE);
-		rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PROTATE);
-		talloc_free(conn->curr_filename);
-		conn->curr_filename = NULL;
-	}
+	if (conn->server->completed_path)
+		osmo_pcap_wr_file_move_to_dir(conn->wrf, conn->server->completed_path);
+
+	osmo_pcap_conn_event(conn, "closingtracefile", conn->wrf->filename);
+	rate_ctr_inc2(conn->ctrg, PEER_CTR_PROTATE);
+	rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PROTATE);
+
+	osmo_pcap_wr_file_free(conn->wrf);
+	conn->wrf = NULL;
 }
 
 void osmo_pcap_conn_close(struct osmo_pcap_conn *conn)
@@ -358,7 +274,7 @@ void osmo_pcap_conn_close(struct osmo_pcap_conn *conn)
 /* Update conn->last_write if needed. This field is used to keep the last time
  * period where we wrote to the pcap file. Once a new write period (based on
  * rotation VTY config) is detected, the pcap file we write to is rotated. */
-static void update_last_write(struct osmo_pcap_conn *conn, time_t now, size_t len)
+static void update_last_write(struct osmo_pcap_conn *conn, time_t now)
 {
 	time_t last = mktime(&conn->last_write);
 
@@ -368,8 +284,6 @@ static void update_last_write(struct osmo_pcap_conn *conn, time_t now, size_t le
 	 * using the current one. */
 	if (now > last)
 		localtime_r(&now, &conn->last_write);
-
-	conn->wr_offset += len;
 }
 
 void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
@@ -377,15 +291,16 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 	time_t now = time(NULL);
 	struct tm tm;
 	int rc;
-	char *real_base_path;
+	char *real_base_path, *curr_filename;
 
 	osmo_pcap_conn_close_trace(conn);
 
 	/* omit any storing/creation of the file */
 	if (!conn->store) {
-		update_last_write(conn, now, 0);
-		talloc_free(conn->curr_filename);
-		conn->curr_filename = NULL;
+		update_last_write(conn, now);
+		/* TODO: Once we support async write, we'll want to schedule close here instead of freeing: */
+		osmo_pcap_wr_file_free(conn->wrf);
+		conn->wrf = NULL;
 		return;
 	}
 
@@ -396,32 +311,31 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 		     conn->server->base_path, strerror(errno));
 		return;
 	}
-	conn->curr_filename = talloc_asprintf(conn, "%s/trace-%s-%d%.2d%.2d_%.2d%.2d%.2d.%s",
-					      real_base_path, conn->name,
-					      tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-					      tm.tm_hour, tm.tm_min, tm.tm_sec,
-					      conn->file_fmt == OSMO_PCAP_FMT_PCAP ? "pcap" : "pcapng");
+	curr_filename = talloc_asprintf(conn, "%s/trace-%s-%d%.2d%.2d_%.2d%.2d%.2d.%s",
+					real_base_path, conn->name,
+					tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+					tm.tm_hour, tm.tm_min, tm.tm_sec,
+					conn->file_fmt == OSMO_PCAP_FMT_PCAP ? "pcap" : "pcapng");
 	free(real_base_path);
-	if (!conn->curr_filename) {
+	if (!curr_filename) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to assemble filename for %s.\n", conn->name);
 		return;
 	}
 
-	conn->local_fd = creat(conn->curr_filename, conn->server->permission_mask);
-	if (conn->local_fd < 0) {
-		LOGP(DSERVER, LOGL_ERROR, "Failed to create file '%s': %s\n",
-		     conn->curr_filename, strerror(errno));
+	conn->wrf = osmo_pcap_wr_file_alloc(conn, conn);
+	rc = osmo_pcap_wr_file_open(conn->wrf, curr_filename, conn->server->permission_mask);
+	talloc_free(curr_filename);
+	if (rc < 0)
 		return;
-	}
-	conn->wr_offset = 0;
 
-	rc = write(conn->local_fd, conn->file_hdr, conn->file_hdr_len);
+	rc = osmo_pcap_wr_file_write(conn->wrf, conn->file_hdr, conn->file_hdr_len);
 	if (rc != conn->file_hdr_len) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to write the header: %d\n", errno);
-		close_local_fd(conn);
+		osmo_pcap_wr_file_free(conn->wrf);
+		conn->wrf = NULL;
 		return;
 	}
-	update_last_write(conn, now, rc);
+	update_last_write(conn, now);
 }
 
 void osmo_pcap_server_reopen(struct osmo_pcap_server *server)
@@ -442,9 +356,10 @@ void osmo_pcap_server_reopen(struct osmo_pcap_server *server)
 /* Returns true if pcap was re-opened */
 static bool check_restart_pcap_max_size(struct osmo_pcap_conn *conn, size_t data_len)
 {
+	OSMO_ASSERT(conn->wrf);
 	if (!pcap_server->max_size_enabled)
 		return false;
-	if (conn->wr_offset + data_len <= conn->server->max_size)
+	if (conn->wrf->wr_offset + data_len <= conn->server->max_size)
 		return false;
 
 	LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s (max-size)\n", conn->name);
@@ -584,11 +499,11 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data
 	zmq_send_client_data(conn, data, len);
 
 	if (!conn->store) {
-		update_last_write(conn, now, 0);
+		update_last_write(conn, now);
 		return 0;
 	}
 
-	if (conn->local_fd < -1) {
+	if (!conn->wrf) {
 		LOGP(DSERVER, LOGL_ERROR, "No file is open. close connection.\n");
 		return -1;
 	}
@@ -597,12 +512,12 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data
 	if (!check_restart_pcap_max_size(conn, len))
 		check_restart_pcap_localtime(conn, now);
 
-	rc = write(conn->local_fd, data, len);
-	if (rc != len) {
-		LOGP(DSERVER, LOGL_ERROR, "Failed to write for %s\n", conn->name);
+	rc = osmo_pcap_wr_file_write(conn->wrf, data, len);
+	if (rc < 0) {
+		LOGP(DSERVER, LOGL_ERROR, "%s: Failed writing to file\n", conn->name);
 		return -1;
 	}
-	update_last_write(conn, now, rc);
+	update_last_write(conn, now);
 	return 0;
 }
 

@@ -73,6 +73,22 @@ enum {
 	SERVER_CTR_NOCLIENT,
 };
 
+struct osmo_pcap_wr_file {
+	void *data; /* user backpointer */
+	/* canonicalized absolute pathname of pcap file we write to */
+	char *filename;
+	/* file descriptor of the file we write to */
+	int local_fd;
+	/* Current write offset of the file we write to (local_fd) */
+	off_t wr_offset;
+};
+struct osmo_pcap_wr_file *osmo_pcap_wr_file_alloc(void *ctx, void *data);
+void osmo_pcap_wr_file_free(struct osmo_pcap_wr_file *wrf);
+int osmo_pcap_wr_file_open(struct osmo_pcap_wr_file *wrf, const char *filename, mode_t mode);
+void osmo_pcap_wr_file_close(struct osmo_pcap_wr_file *wrf);
+int osmo_pcap_wr_file_write(struct osmo_pcap_wr_file *wrf, const uint8_t *data, size_t len);
+void osmo_pcap_wr_file_move_to_dir(struct osmo_pcap_wr_file *wrf, const char *dst_dirpath);
+
 struct osmo_pcap_conn {
 	/* list of connections */
 	struct llist_head entry;
@@ -86,12 +102,7 @@ struct osmo_pcap_conn {
 
 	/* Remote connection */
 	struct osmo_stream_srv *srv;
-	/* canonicalized absolute pathname of pcap file we write to */
-	char *curr_filename;
-	/* file descriptor of the file we write to */
-	int local_fd;
-	/* Current write offset of the file we write to (local_fd) */
-	off_t wr_offset;
+	struct osmo_pcap_wr_file *wrf;
 
 	/* pcap stuff */
 	enum osmo_pcap_fmt file_fmt;

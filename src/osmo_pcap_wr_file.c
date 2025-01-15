@@ -1,5 +1,5 @@
 /*
- * Write to a file
+ * Asynchronous non-blocking write to a file
  *
  * (C) 2025 by sysmocom - s.f.m.c. GmbH <info@sysmocom.de>
  * All Rights Reserved
@@ -32,14 +32,51 @@
 #include <osmo-pcap/common.h>
 #include <osmo-pcap/osmo_pcap_server.h>
 
+static void local_iofd_write_cb(struct osmo_io_fd *iofd, int res, struct msgb *msg)
+{
+	struct osmo_pcap_wr_file *wrf = osmo_iofd_get_data(iofd);
+
+	LOGP(DSERVER, LOGL_DEBUG, "%s,fd=%d,wr_completed=%zu: write_cb(res=%d)\n",
+	     osmo_iofd_get_name(iofd), osmo_iofd_get_fd(iofd), (size_t)wrf->wr_completed, res);
+	if (res <= 0) {
+		LOGP(DSERVER, LOGL_ERROR, "%s,fd=%d,wr_completed=%zu: Failed writing: %s (%d)\n",
+		     osmo_iofd_get_name(iofd), osmo_iofd_get_fd(iofd), (size_t)wrf->wr_completed,
+		     strerror(-res), res);
+		/* Trigger cb to tell user to free it, even if it was not being flushed.
+		 * Special attention must be kept at the user regarding this code path, ie.
+		 * user can't assume the wrf was actually in flushing state...
+		 */
+		if (wrf->flush_completed_cb)
+			wrf->flush_completed_cb(wrf, wrf->data);
+		/* wrf may be freed here. */
+		return;
+	}
+
+	wrf->wr_completed += res;
+
+	if (osmo_pcap_wr_file_is_flushing(wrf)) {
+		if (!osmo_pcap_wr_file_has_pending_writes(wrf)) {
+			LOGP(DSERVER, LOGL_DEBUG, "%s,fd=%d,wr_completed=%zu: closing now after completed data write\n",
+			     osmo_iofd_get_name(iofd), osmo_iofd_get_fd(iofd), (size_t)wrf->wr_completed);
+			if (wrf->flush_completed_cb)
+				wrf->flush_completed_cb(wrf, wrf->data);
+			/* wrf may be freed here. */
+			return;
+		}
+	}
+}
+
 struct osmo_pcap_wr_file *osmo_pcap_wr_file_alloc(void *ctx, void *data)
 {
 	struct osmo_pcap_wr_file *wrf = talloc_zero(ctx, struct osmo_pcap_wr_file);
 	OSMO_ASSERT(wrf);
 
+	/* Initialize entry so that we can know whether we are included in a
+	 * list in osmo_pcap_wr_file_is_flushing(): */
+	INIT_LLIST_HEAD(&wrf->entry);
 	wrf->data = data;
-	wrf->local_fd = -1;
 	wrf->wr_offset = 0;
+	wrf->wr_completed = 0;
 
 	return wrf;
 }
@@ -49,22 +86,43 @@ void osmo_pcap_wr_file_free(struct osmo_pcap_wr_file *wrf)
 	if (!wrf)
 		return;
 	osmo_pcap_wr_file_close(wrf);
+	if (osmo_pcap_wr_file_is_flushing(wrf))
+		llist_del(&wrf->entry);
 	talloc_free(wrf);
+}
+
+void osmo_pcap_wr_file_set_flush_completed_cb(struct osmo_pcap_wr_file *wrf, osmo_pcap_wr_file_flush_completed_cb_t flush_completed_cb)
+{
+	wrf->flush_completed_cb = flush_completed_cb;
 }
 
 int osmo_pcap_wr_file_open(struct osmo_pcap_wr_file *wrf, const char *filename, mode_t mode)
 {
+	struct osmo_io_ops ioops = {
+		.read_cb = NULL,
+		.write_cb = local_iofd_write_cb,
+	};
 	int rc;
 	OSMO_ASSERT(filename);
-	OSMO_ASSERT(wrf->local_fd == -1);
+	OSMO_ASSERT(wrf->local_iofd == NULL);
 
-	rc = open(filename, O_CREAT|O_WRONLY|O_TRUNC, mode);
+	rc = open(filename, O_CREAT|O_WRONLY|O_TRUNC|O_NONBLOCK, mode);
 	if (rc < 0) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to open file '%s': %s\n",
 		     filename, strerror(errno));
 		return rc;
 	}
-	wrf->local_fd = rc;
+
+	wrf->local_iofd = osmo_iofd_setup(wrf, rc, filename, OSMO_IO_FD_MODE_READ_WRITE,
+					  &ioops, wrf);
+	if (!wrf->local_iofd)
+		return -EBADFD;
+	if (osmo_iofd_register(wrf->local_iofd, -1) < 0) {
+		osmo_iofd_free(wrf->local_iofd);
+		wrf->local_iofd = NULL;
+		return -ENAVAIL;
+	}
+
 	wrf->filename = talloc_strdup(wrf, filename);
 	OSMO_ASSERT(wrf->filename);
 	return rc;
@@ -72,24 +130,53 @@ int osmo_pcap_wr_file_open(struct osmo_pcap_wr_file *wrf, const char *filename, 
 
 void osmo_pcap_wr_file_close(struct osmo_pcap_wr_file *wrf)
 {
-	if (wrf->local_fd > 0) {
-		close(wrf->local_fd);
-		wrf->local_fd = -1;
-	}
+	osmo_iofd_free(wrf->local_iofd);
+	wrf->local_iofd = NULL;
 }
 
-int osmo_pcap_wr_file_write(struct osmo_pcap_wr_file *wrf, const uint8_t *data, size_t len)
+int osmo_pcap_wr_file_write_msgb(struct osmo_pcap_wr_file *wrf, struct msgb *msg)
 {
-	int rc = write(wrf->local_fd, data, len);
-	if (rc >= 0) {
-		wrf->wr_offset += rc;
-		if (rc != len) {
-			LOGP(DSERVER, LOGL_ERROR, "Short write '%s': ret %d != %zu\n",
-			     wrf->filename, rc, len);
-			return -1;
-		}
-	}
+	int rc = osmo_iofd_write_msgb(wrf->local_iofd, msg);
+	if (rc < 0)
+		return rc;
+	wrf->wr_offset += msgb_length(msg);
 	return rc;
+}
+
+bool osmo_pcap_wr_file_has_pending_writes(const struct osmo_pcap_wr_file *wrf)
+{
+	return wrf->wr_completed < wrf->wr_offset;
+}
+
+/* Mark the wrf as done writing to it. It will be closed and freed
+ * asynchronously when all data has been written to it.
+ * wrf may be freed during the call to this function, so don't use it anymore. */
+int osmo_pcap_wr_file_flush(struct osmo_pcap_wr_file *wrf, struct llist_head *wrf_flushing_list)
+{
+	if (osmo_pcap_wr_file_is_flushing(wrf)) {
+		LOGP(DSERVER, LOGL_ERROR, "Trying to flush a file which was already being flushed: '%s'\n",
+		     wrf->filename);
+		return -EINVAL;
+	}
+
+	if (!osmo_pcap_wr_file_has_pending_writes(wrf)) {
+		if (wrf->flush_completed_cb)
+			wrf->flush_completed_cb(wrf, wrf->data);
+		/* wrf may be freed here. */
+		return 0;
+	}
+
+	/* Put it in the flushing list, it will be closed freed once pending writes complete. */
+	llist_add_tail(&wrf->entry, wrf_flushing_list);
+	return 0;
+}
+
+/* whether we finished pushing more data to the wrf and we are waiting for it to
+ * finish writing before closing:
+ */
+bool osmo_pcap_wr_file_is_flushing(const struct osmo_pcap_wr_file *wrf)
+{
+	return !llist_empty(&wrf->entry);
 }
 
 /* Move file from current dir to dst_dirpath, and updates wrf->filename to point to new location. */

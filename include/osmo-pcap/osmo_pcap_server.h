@@ -29,6 +29,7 @@
 
 #include <pcap.h>
 
+#include <osmocom/core/osmo_io.h>
 #include <osmocom/core/select.h>
 #include <osmocom/core/linuxlist.h>
 #include <osmocom/core/write_queue.h>
@@ -73,20 +74,30 @@ enum {
 	SERVER_CTR_NOCLIENT,
 };
 
+struct osmo_pcap_wr_file;
+typedef void (*osmo_pcap_wr_file_flush_completed_cb_t)(struct osmo_pcap_wr_file *wrf, void *data);
 struct osmo_pcap_wr_file {
+	struct llist_head entry; /* entry into (osmo_pcap_conn)->wrf_flushing_list */
 	void *data; /* user backpointer */
 	/* canonicalized absolute pathname of pcap file we write to */
 	char *filename;
 	/* file descriptor of the file we write to */
-	int local_fd;
+	struct osmo_io_fd *local_iofd;
 	/* Current write offset of the file we write to (local_fd) */
 	off_t wr_offset;
+	/* Number of bytes confirmed to be written, <=wr_offset */
+	off_t wr_completed;
+	osmo_pcap_wr_file_flush_completed_cb_t flush_completed_cb;
 };
 struct osmo_pcap_wr_file *osmo_pcap_wr_file_alloc(void *ctx, void *data);
 void osmo_pcap_wr_file_free(struct osmo_pcap_wr_file *wrf);
+void osmo_pcap_wr_file_set_flush_completed_cb(struct osmo_pcap_wr_file *wrf, osmo_pcap_wr_file_flush_completed_cb_t flush_completed_cb);
 int osmo_pcap_wr_file_open(struct osmo_pcap_wr_file *wrf, const char *filename, mode_t mode);
 void osmo_pcap_wr_file_close(struct osmo_pcap_wr_file *wrf);
-int osmo_pcap_wr_file_write(struct osmo_pcap_wr_file *wrf, const uint8_t *data, size_t len);
+int osmo_pcap_wr_file_write_msgb(struct osmo_pcap_wr_file *wrf, struct msgb *msg);
+bool osmo_pcap_wr_file_has_pending_writes(const struct osmo_pcap_wr_file *wrf);
+int osmo_pcap_wr_file_flush(struct osmo_pcap_wr_file *wrf, struct llist_head *wrf_flushing_list);
+bool osmo_pcap_wr_file_is_flushing(const struct osmo_pcap_wr_file *wrf);
 void osmo_pcap_wr_file_move_to_dir(struct osmo_pcap_wr_file *wrf, const char *dst_dirpath);
 
 struct osmo_pcap_conn {
@@ -103,6 +114,9 @@ struct osmo_pcap_conn {
 	/* Remote connection */
 	struct osmo_stream_srv *srv;
 	struct osmo_pcap_wr_file *wrf;
+	/* list of osmo_pcap_wr_file->entry.
+	 * wrf which we want to close but still have pending writes to be completed */
+	struct llist_head wrf_flushing_list;
 
 	/* pcap stuff */
 	enum osmo_pcap_fmt file_fmt;

@@ -116,6 +116,35 @@ static void zmq_send_client_data(struct osmo_pcap_conn *conn,
 			0);
 }
 
+/* wrf has written all data and can safely be closed, rotated, etc. */
+static void osmo_pcap_wr_file_flush_completed_cb(struct osmo_pcap_wr_file *wrf, void *data)
+{
+	struct osmo_pcap_conn *conn = data;
+
+	if (wrf->wr_completed < wrf->wr_offset) {
+		LOGP(DSERVER, LOGL_NOTICE, "%s: Closing file with pending writes (%zu completed bytes < %zu wrote bytes)\n",
+		     wrf->filename, wrf->wr_completed, wrf->wr_offset);
+	}
+
+	if (!osmo_pcap_wr_file_is_flushing(wrf)) {
+		/* If it is not flushing, it probably is still assigned to conn;
+		 * unassign it: */
+		if (conn->wrf == wrf)
+			conn->wrf = NULL;
+	}
+
+	osmo_pcap_wr_file_close(wrf);
+
+	if (conn->server->completed_path)
+		osmo_pcap_wr_file_move_to_dir(wrf, conn->server->completed_path);
+
+	osmo_pcap_conn_event(conn, "closingtracefile", wrf->filename);
+	rate_ctr_inc2(conn->ctrg, PEER_CTR_PROTATE);
+	rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PROTATE);
+
+	osmo_pcap_wr_file_free(wrf);
+}
+
 static inline size_t calc_data_max_len(const struct osmo_pcap_server *server)
 {
 	size_t data_max_len;
@@ -168,6 +197,7 @@ static struct osmo_pcap_conn *osmo_pcap_conn_alloc(struct osmo_pcap_server *serv
 		return NULL;
 	}
 
+	INIT_LLIST_HEAD(&conn->wrf_flushing_list);
 	conn->data_max_len = calc_data_max_len(server);
 	conn->data = talloc_zero_size(conn, sizeof(struct osmo_pcap_data) + conn->data_max_len);
 	/* a bit nasty. we do not work with ids but names */
@@ -227,7 +257,11 @@ struct osmo_pcap_conn *osmo_pcap_server_find_or_create(
 
 void osmo_pcap_conn_free(struct osmo_pcap_conn *conn)
 {
+	struct osmo_pcap_wr_file *wrf;
 	osmo_pcap_conn_close(conn);
+	/* We are freeing, make sure all files are processed even if we may be losing some data... */
+	while ((wrf = llist_first_entry_or_null(&conn->wrf_flushing_list, struct osmo_pcap_wr_file, entry)))
+		osmo_pcap_wr_file_flush_completed_cb(wrf, conn);
 	llist_del(&conn->entry);
 	talloc_free(conn);
 }
@@ -237,16 +271,8 @@ void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn)
 	if (!conn->wrf)
 		return;
 
-	osmo_pcap_wr_file_close(conn->wrf);
-
-	if (conn->server->completed_path)
-		osmo_pcap_wr_file_move_to_dir(conn->wrf, conn->server->completed_path);
-
-	osmo_pcap_conn_event(conn, "closingtracefile", conn->wrf->filename);
-	rate_ctr_inc2(conn->ctrg, PEER_CTR_PROTATE);
-	rate_ctr_inc2(conn->server->ctrg, SERVER_CTR_PROTATE);
-
-	osmo_pcap_wr_file_free(conn->wrf);
+	osmo_pcap_wr_file_flush(conn->wrf, &conn->wrf_flushing_list);
+	/* conn->wrf may have been freed or moved to conn->wrf_flushing_list: */
 	conn->wrf = NULL;
 }
 
@@ -298,9 +324,6 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 	/* omit any storing/creation of the file */
 	if (!conn->store) {
 		update_last_write(conn, now);
-		/* TODO: Once we support async write, we'll want to schedule close here instead of freeing: */
-		osmo_pcap_wr_file_free(conn->wrf);
-		conn->wrf = NULL;
 		return;
 	}
 
@@ -323,16 +346,21 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 	}
 
 	conn->wrf = osmo_pcap_wr_file_alloc(conn, conn);
+	osmo_pcap_wr_file_set_flush_completed_cb(conn->wrf, osmo_pcap_wr_file_flush_completed_cb);
 	rc = osmo_pcap_wr_file_open(conn->wrf, curr_filename, conn->server->permission_mask);
 	talloc_free(curr_filename);
 	if (rc < 0)
 		return;
 
-	rc = osmo_pcap_wr_file_write(conn->wrf, conn->file_hdr, conn->file_hdr_len);
-	if (rc != conn->file_hdr_len) {
+	/* TODO: get msgb from conn object stored: */
+	struct msgb *msg = msgb_alloc_c(conn->wrf, conn->file_hdr_len, "local_iofd_hdr");
+	memcpy(msgb_put(msg, conn->file_hdr_len), conn->file_hdr, conn->file_hdr_len);
+
+	rc = osmo_pcap_wr_file_write_msgb(conn->wrf, msg);
+	if (rc < 0) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to write the header: %d\n", errno);
-		osmo_pcap_wr_file_free(conn->wrf);
-		conn->wrf = NULL;
+		msgb_free(msg);
+		osmo_pcap_conn_close_trace(conn);
 		return;
 	}
 	update_last_write(conn, now);
@@ -512,9 +540,14 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data
 	if (!check_restart_pcap_max_size(conn, len))
 		check_restart_pcap_localtime(conn, now);
 
-	rc = osmo_pcap_wr_file_write(conn->wrf, data, len);
+	/* TODO: get msgb from caller: */
+	struct msgb *msg = msgb_alloc_c(conn->wrf, len, "local_iofd_msg");
+	memcpy(msgb_put(msg, len), data, len);
+
+	rc = osmo_pcap_wr_file_write_msgb(conn->wrf, msg);
 	if (rc < 0) {
 		LOGP(DSERVER, LOGL_ERROR, "%s: Failed writing to file\n", conn->name);
+		msgb_free(msg);
 		return -1;
 	}
 	update_last_write(conn, now);

@@ -252,7 +252,7 @@ static int rx_link_data(struct osmo_pcap_conn *conn, const struct osmo_pcap_data
 	if ((rc = validate_link_data(conn, data)) < 0)
 		return rc;
 
-	if ((rc = osmo_pcap_conn_process_data(conn, &data->data[0], data->len)))
+	if ((rc = osmo_pcap_conn_process_data(conn, &data->data[0], data->len)) < 0)
 		return rc;
 	return 1;
 }

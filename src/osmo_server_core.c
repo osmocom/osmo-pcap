@@ -109,7 +109,7 @@ static void zmq_send_client_data(struct osmo_pcap_conn *conn,
 	talloc_free(event_name);
 
 	pcap_zmq_send(conn->server->zmq_publ,
-			conn->file_hdr, conn->file_hdr_len,
+			msgb_data(conn->file_hdr_msg), msgb_length(conn->file_hdr_msg),
 			ZMQ_SNDMORE);
 	pcap_zmq_send(conn->server->zmq_publ,
 			data, len,
@@ -199,7 +199,6 @@ static struct osmo_pcap_conn *osmo_pcap_conn_alloc(struct osmo_pcap_server *serv
 
 	INIT_LLIST_HEAD(&conn->wrf_flushing_list);
 	conn->data_max_len = calc_data_max_len(server);
-	conn->data = talloc_zero_size(conn, sizeof(struct osmo_pcap_data) + conn->data_max_len);
 	/* a bit nasty. we do not work with ids but names */
 	desc = talloc_zero(conn, struct rate_ctr_group_desc);
 	if (!desc) {
@@ -289,9 +288,11 @@ void osmo_pcap_conn_close(struct osmo_pcap_conn *conn)
 		close(conn->rem_wq.bfd.fd);
 		conn->rem_wq.bfd.fd = -1;
 		osmo_tls_release(&conn->tls_session);
+		msgb_free(conn->rx_tls_dec_msg);
+		conn->rx_tls_dec_msg = NULL;
 	}
-	TALLOC_FREE(conn->file_hdr);
-	conn->file_hdr_len = 0;
+	msgb_free(conn->file_hdr_msg);
+	conn->file_hdr_msg = NULL;
 
 	osmo_pcap_conn_close_trace(conn);
 	osmo_pcap_conn_event(conn, "disconnect", NULL);
@@ -318,6 +319,7 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 	struct tm tm;
 	int rc;
 	char *real_base_path, *curr_filename;
+	struct msgb *msg;
 
 	osmo_pcap_conn_close_trace(conn);
 
@@ -352,10 +354,10 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 	if (rc < 0)
 		return;
 
-	/* TODO: get msgb from conn object stored: */
-	struct msgb *msg = msgb_alloc_c(conn->wrf, conn->file_hdr_len, "local_iofd_hdr");
-	memcpy(msgb_put(msg, conn->file_hdr_len), conn->file_hdr, conn->file_hdr_len);
-
+	/* We need to keep a clone assigned to conn to check for incoming hdr changes: */
+	OSMO_ASSERT(conn->file_hdr_msg);
+	msg = msgb_copy_c(conn->wrf, conn->file_hdr_msg, "wrf_hdr");
+	OSMO_ASSERT(msg);
 	rc = osmo_pcap_wr_file_write_msgb(conn->wrf, msg);
 	if (rc < 0) {
 		LOGP(DSERVER, LOGL_ERROR, "Failed to write the header: %d\n", errno);
@@ -518,16 +520,17 @@ static bool check_restart_pcap_localtime(struct osmo_pcap_conn *conn, time_t now
 }
 
 /* New recorded packet is received.
- * Returns 0 on success, negative on error. */
-int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data, size_t len)
+ * Returns 0 on success (and owns msgb), negative on error (msgb to be freed by caller). */
+int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, struct msgb *msg)
 {
 	time_t now = time(NULL);
 	int rc;
 
-	zmq_send_client_data(conn, data, len);
+	zmq_send_client_data(conn, msgb_data(msg), msgb_length(msg));
 
 	if (!conn->store) {
 		update_last_write(conn, now);
+		msgb_free(msg);
 		return 0;
 	}
 
@@ -537,20 +540,18 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data
 	}
 
 	/* Check if we are past the limit or on a day change. */
-	if (!check_restart_pcap_max_size(conn, len))
+	if (!check_restart_pcap_max_size(conn, msgb_length(msg)))
 		check_restart_pcap_localtime(conn, now);
 
-	/* TODO: get msgb from caller: */
-	struct msgb *msg = msgb_alloc_c(conn->wrf, len, "local_iofd_msg");
-	memcpy(msgb_put(msg, len), data, len);
-
+	talloc_steal(conn->wrf, msg);
 	rc = osmo_pcap_wr_file_write_msgb(conn->wrf, msg);
 	if (rc < 0) {
 		LOGP(DSERVER, LOGL_ERROR, "%s: Failed writing to file\n", conn->name);
-		msgb_free(msg);
+		/* msgb will be freed by caller */
 		return -1;
 	}
 	update_last_write(conn, now);
+	/* msgb is now owned by conn->wrf. */
 	return 0;
 }
 

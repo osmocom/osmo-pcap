@@ -121,9 +121,29 @@ static int validate_link_hdr(const struct osmo_pcap_conn *conn, const struct osm
 	}
 }
 
-/* returns >0 on success, <= 0 on failure (closes conn) */
-static int rx_link_hdr(struct osmo_pcap_conn *conn, const struct osmo_pcap_data *data)
+/* Updates conn->file_hdr_msg, owns (frees) msg. */
+static void update_conn_file_hdr_msg(struct osmo_pcap_conn *conn, struct msgb *msg)
 {
+	/* The msg chunk of memory to hold the hdr data may actually be a lot bigger than
+	 * the actual data (len << data_len).
+	 * Hence, since we may keep this around for a big time (life of the conn), let's
+	 * better keep a reduced memory footprint msgb instead of the original one: */
+	msgb_free(conn->file_hdr_msg);
+	conn->file_hdr_msg = msgb_copy_resize_c(conn, msg, msgb_length(msg), "conn_file_hdr_msg");
+	OSMO_ASSERT(conn->file_hdr_msg);
+	msgb_free(msg);
+
+	/* pull to l2 is done here at the copy since anyway msgb_copy_resize
+	 * cannot shrink available headroom: */
+	msgb_pull_to_l2(conn->file_hdr_msg);
+
+	osmo_pcap_conn_restart_trace(conn);
+}
+
+/* returns >0 on success (msg becomes owned), <= 0 on failure (closes conn) */
+static int rx_link_hdr(struct osmo_pcap_conn *conn, struct msgb *msg)
+{
+	struct osmo_pcap_data *data = (struct osmo_pcap_data *)msg->l1h;
 	int rc;
 
 	rc = osmo_pcap_file_discover_fmt(data->data, data->len, &conn->file_fmt);
@@ -148,19 +168,11 @@ static int rx_link_hdr(struct osmo_pcap_conn *conn, const struct osmo_pcap_data 
 
 	if (conn->store && !conn->wrf) {
 		/* First received link hdr in conn */
-		talloc_free(conn->file_hdr);
-		conn->file_hdr = talloc_size(conn, data->len);
-		memcpy(conn->file_hdr, data->data, data->len);
-		conn->file_hdr_len = data->len;
-		osmo_pcap_conn_restart_trace(conn);
-	} else if (conn->file_hdr_len != data->len ||
-		   memcmp(&conn->file_hdr, data->data, data->len) != 0) {
+		update_conn_file_hdr_msg(conn, msg);
+	} else if (msgb_l2len(conn->file_hdr_msg) != msgb_l2len(msg) ||
+		   memcmp(msgb_l2(conn->file_hdr_msg), msgb_l2(msg), msgb_l2len(msg)) != 0) {
 		/* Client changed the link hdr in conn */
-		talloc_free(conn->file_hdr);
-		conn->file_hdr = talloc_size(conn, data->len);
-		memcpy(conn->file_hdr, data->data, data->len);
-		conn->file_hdr_len = data->len;
-		osmo_pcap_conn_restart_trace(conn);
+		update_conn_file_hdr_msg(conn, msg);
 	}
 
 	return 1;
@@ -247,22 +259,25 @@ static int validate_link_data(const struct osmo_pcap_conn *conn, const struct os
 }
 
 /* returns >0 on success, <= 0 on failure (closes conn) */
-static int rx_link_data(struct osmo_pcap_conn *conn, const struct osmo_pcap_data *data)
+static int rx_link_data(struct osmo_pcap_conn *conn, struct msgb *msg)
 {
 	int rc;
 
-	if ((rc = validate_link_data(conn, data)) < 0)
+	if ((rc = validate_link_data(conn, (struct osmo_pcap_data *)msg->l1h)) < 0)
 		return rc;
 
-	if ((rc = osmo_pcap_conn_process_data(conn, &data->data[0], data->len)) < 0)
+	msgb_pull_to_l2(msg);
+	if ((rc = osmo_pcap_conn_process_data(conn, msg)) < 0)
 		return rc;
 	return 1;
 }
 
 /* Read segment payload, of size data->len.
- * returns >0 on success, <= 0 on failure (closes conn) */
-static int rx_link(struct osmo_pcap_conn *conn, const struct osmo_pcap_data *data)
+ * returns >0 on success, <= 0 on failure (closes conn).
+ * Message is always owned or freed here. */
+static int rx_link(struct osmo_pcap_conn *conn, struct msgb *msg)
 {
+	struct osmo_pcap_data *data = (struct osmo_pcap_data *)msg->l1h;
 	int rc;
 
 	/* count the full packet we got */
@@ -275,14 +290,17 @@ static int rx_link(struct osmo_pcap_conn *conn, const struct osmo_pcap_data *dat
 
 	switch (data->type) {
 	case PKT_LINK_HDR:
-		rc = rx_link_hdr(conn, data);
+		rc = rx_link_hdr(conn, msg);
 		break;
 	case PKT_LINK_DATA:
-		rc = rx_link_data(conn, data);
+		rc = rx_link_data(conn, msg);
 		break;
 	default:
 		OSMO_ASSERT(0);
 	}
+
+	if (rc <= 0)
+		msgb_free(msg);
 
 	if (conn->reopen_delayed) {
 		LOGP(DSERVER, LOGL_INFO, "Reopening log for %s now.\n", conn->name);
@@ -306,60 +324,69 @@ static int do_read_tls(struct osmo_pcap_conn *conn, void *buf, size_t want_size)
 static int tls_read_cb_initial(struct osmo_pcap_conn *conn)
 {
 	int rc;
+	struct msgb *msg = conn->rx_tls_dec_msg;
+	msg->l1h = msgb_data(msg);
+	struct osmo_pcap_data *pdata = (struct osmo_pcap_data *)msg->l1h;
+	size_t pend = sizeof(*pdata) - msgb_length(msg);
 
-	rc = do_read_tls(conn, ((uint8_t *)conn->data) + sizeof(*conn->data) - conn->pend, conn->pend);
+	OSMO_ASSERT(sizeof(*pdata) > msgb_length(msg));
+
+	rc = do_read_tls(conn, msg->tail, pend);
 	if (rc <= 0) {
 		LOGP(DSERVER, LOGL_ERROR,
-		     "Too short packet. Got %d, wanted %d\n", rc, conn->data->len);
+		     "Too short packet. Got %d, wanted %zu\n", rc, pend);
 		return -1;
 	}
-
-	conn->pend -= rc;
-	if (conn->pend < 0) {
+	if (rc > pend) {
 		LOGP(DSERVER, LOGL_ERROR,
-		     "Someone got the pending read wrong: %d\n", conn->pend);
+		     "Someone got the pending read wrong: %zu\n", pend);
 		return -1;
 	}
-	if (conn->pend > 0)
+	msgb_put(msg, rc);
+
+	if (pend > rc)
 		return 1; /* Wait for more data before continuing */
 
-	conn->data->len = ntohs(conn->data->len);
+	pdata->len = ntohs(pdata->len);
 
-	if (conn->data->len > conn->data_max_len) {
+	if (pdata->len + sizeof(*pdata) > conn->data_max_len) {
 		LOGP(DSERVER, LOGL_ERROR, "Implausible data length: %u > %zu (snaplen %u)\n",
-		     conn->data->len, conn->data_max_len, conn->server->max_snaplen);
+		     pdata->len, conn->data_max_len, conn->server->max_snaplen);
 		return -1;
 	}
 
 	conn->state = STATE_DATA;
-	conn->pend = conn->data->len;
+	msg->l2h = msg->tail;
 	return 1;
 }
 
 static int tls_read_cb_data(struct osmo_pcap_conn *conn)
 {
 	int rc;
+	struct msgb *msg = conn->rx_tls_dec_msg;
+	struct osmo_pcap_data *pdata = (struct osmo_pcap_data *)msg->l1h;
+	size_t pend = pdata->len - msgb_l2len(msg);
 
-	rc = do_read_tls(conn, &conn->data->data[conn->data->len - conn->pend], conn->pend);
+	rc = do_read_tls(conn, msg->tail, pend);
 	if (rc <= 0) {
 		LOGP(DSERVER, LOGL_ERROR,
-		     "Too short packet. Got %d, wanted %d\n", rc, conn->data->len);
+		     "Too short packet. Got %d, wanted %u\n", rc, pdata->len);
 		return -1;
 	}
-
-	conn->pend -= rc;
-	if (conn->pend < 0) {
+	if (rc > pend) {
 		LOGP(DSERVER, LOGL_ERROR,
-		     "Someone got the pending read wrong: %d\n", conn->pend);
+		     "Someone got the pending read wrong: %zu\n", pend);
 		return -1;
 	}
-	if (conn->pend > 0)
+	msgb_put(msg, rc);
+
+	if (pend > rc)
 		return 1; /* Wait for more data before continuing */
 
 	conn->state = STATE_INITIAL;
-	conn->pend = sizeof(*conn->data);
+	conn->rx_tls_dec_msg = msgb_alloc_c(conn, conn->data_max_len, "rx_tls_dec_data");
 
-	return rx_link(conn, conn->data);
+	return rx_link(conn, msg);
 }
 
 /* returns >0 on success, <= 0 on failure (closes conn) */
@@ -422,11 +449,15 @@ int conn_read_cb(struct osmo_stream_srv *srv, int res, struct msgb *msg)
 		return 0;
 	}
 
-	data = (struct osmo_pcap_data *)msgb_data(msg);
+	OSMO_ASSERT(msgb_length(msg) >= sizeof(*data));
+
+	msg->l1h = msgb_data(msg);
+	data = (struct osmo_pcap_data *)msg->l1h;
 	data->len = osmo_ntohs(data->len);
 
-	rc = rx_link(conn, data);
-	msgb_free(msg);
+	msg->l2h = msg->l1h + sizeof(*data);
+
+	rc = rx_link(conn, msg);
 	if (rc <= 0)
 		osmo_pcap_conn_close(conn);
 	return 0;
@@ -485,7 +516,7 @@ static void new_connection(struct osmo_pcap_server *server,
 		}
 		/* Prepare for first read of segment header: */
 		conn->state = STATE_INITIAL;
-		conn->pend = sizeof(struct osmo_pcap_data);
+		conn->rx_tls_dec_msg = msgb_alloc_c(conn, conn->data_max_len, "rx_tls_dec_data");
 		if (!osmo_tls_init_server_session(conn, server)) {
 			osmo_pcap_conn_close(conn);
 			return;

@@ -121,15 +121,13 @@ struct osmo_pcap_conn {
 	/* pcap stuff */
 	enum osmo_pcap_fmt file_fmt;
 	bool pcapng_endian_swapped;
-	uint8_t *file_hdr;
-	uint32_t file_hdr_len;
+	struct msgb *file_hdr_msg;
 
 	/* last time */
 	struct tm last_write;
 
 	/* read buffering */
 	int state;
-	int pend;
 	bool reopen_delayed;
 	size_t data_max_len; /* size of allocated buffer in data->data. */
 
@@ -141,13 +139,13 @@ struct osmo_pcap_conn {
 	size_t tls_limit_read;
 	struct osmo_tls_session tls_session;
 	struct osmo_wqueue rem_wq;
-	struct osmo_pcap_data *data; /* Used to store TLS decoded data */
+	struct msgb *rx_tls_dec_msg; /* Used to store TLS decoded data */
 };
 
 void osmo_pcap_conn_free(struct osmo_pcap_conn *conn);
 void vty_server_init(void);
 void osmo_pcap_conn_close(struct osmo_pcap_conn *conn);
-int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, const uint8_t *data, size_t len);
+int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, struct msgb *msg);
 void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn);
 void osmo_pcap_conn_close_trace(struct osmo_pcap_conn *conn);
 void osmo_pcap_conn_event(struct osmo_pcap_conn *conn,

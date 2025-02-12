@@ -7,5 +7,3 @@
 # If any interfaces have been added since the last public release: c:r:a + 1.
 # If any interfaces have been removed or changed since the last public release: c:r:0.
 #library	what			description / commit summary line
-libosmocore >1.10.0	iofd_msgb_alloc() supports allocating 0xfffff bytes. libosmocore Change-Id I6f9125916a301414301587f84fc3db98549a2f3f
-libosmo-netif >1.5.0 osmo_stream_srv_set_segmentation_cb2()

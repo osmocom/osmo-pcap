@@ -1,3 +1,72 @@
+osmo-pcap (0.6.0) unstable; urgency=medium
+
+  [ Pau Espin Pedrol ]
+  * pcap-server: Take into account PDU len when calculating pcap max-size
+  * pcap-server: Move write checks to reopen pcap into helper functions
+  * pcap-server: New vty command 'no max-file-size'
+  * tests/Makefile.am: Fix trailing whitespace
+  * src/Makefile.am: Improve formatting
+  * pcap-server: Fix [no] max-file-size regression
+  * pcap-server: Move stats to its own file
+  * pcap-server: Make rotate-localtime feature configurable through VTY
+  * pcap-server: Improve log error opening pcap file
+  * pcap-server: Avoid pcap time-based rotation if wall clock went backwards
+  * pcap-client: Move conns llist initialization to constructor
+  * pcap-client: Split client-conn allocation to its own constructor function
+  * pcap-client: Alloc default client conn similarly to other ones
+  * pcap-client: Add missing '_conn' in  function names
+  * pcap-client: Split wrapped ctr generic calculation to helper function
+  * pcap-client: Decouple dev capture handling from client
+  * pcap-client: Improve pcap_handle logging
+  * pcap-client: Improve conn logging
+  * pcap-client: Move stats to its own file
+  * pcap-client,pcap-server: Use rate_ctr_inc2 and rate_ctr_add2 APIs
+  * pcap-client: Add per iface counter group instance
+  * pcap-client: Allow recording on several interfaces
+  * pcap-server: Use osmo_talloc_replace_string() to replace base-path
+  * pcap-server: Move struct osmo_pcap_server alloc to its own helper function
+  * pcap-server: remove unneeded check for null base_path
+  * pcap-server: Resolve real path of pcap file before opening
+  * pcap-server: Introduce VTY cmd '[no] completed-path'
+  * Use #pragma once in all header files
+  * server: Rename static functions
+  * server: Simplify (store|no-store) feature
+  * cosmetic: server: document functions
+  * server: Simplify code paths in read_cb_*
+  * server: Delay reopen of pcap only until necessary
+  * server: Store read buf max len as conn field
+  * server: Split osmo_pcap_conn alloc to its own function
+  * server: Rename function osmo_pcap_server_delete -> osmo_pcap_conn_free
+  * cosmetic: server: Fix typo in comment
+  * server: Rename func client_data() -> zmq_send_client_data()
+  * Cleanup and reorder includes in header files
+  * Makefile.am: proper format and reorder source file lists
+  * client: Introduce osmo_pcap_file to prepare support for pcapng
+  * client: Support generation of pcapng file format
+  * server: Support storing of pcapng format
+  * server: Rename osmo_pcap_server_close_trace -> osmo_pcap_conn_close_trace
+  * Rename osmo_pcap_server_close_conn -> osmo_pcap_conn_close
+  * server: Split network code into its own file
+  * server: Avoid lseek syscall on every packet write to pcap file
+  * cosmetic: osmo_tls: Fix indentation whitespace
+  * server: Move osmo_pcap_server_alloc() to osmo_server_core.c
+  * server: Use osmo_sockaddr in remote_addr field
+  * tests: Remove unneeded .o files after osmo-pcap-server network/core file split
+  * cosmetic: server: Fix formatting of return in main()
+  * server: Move conn->file_hdr release to osmo_pcap_conn_close()
+  * server: Add osmo_pcap_server_free() for completeness
+  * server: Split buffer read from full msg handling
+  * server: Log unable to figure out pcap vs pcapng
+  * server: Limit rx buffer size to UINT16_MAX
+  * server: Use osmo_stream_srv_link on tcp listen socket
+  * server: Correct error check calling osmo_pcap_conn_process_data()
+  * server: Use osmo_stream_srv for non-tls read tcp sock
+  * server: Introduce struct osmo_pcap_wr_file
+  * server: Implement non-blocking write to pcap file with osmo_io
+  * server: zero-copy msgb from tcp read to file write
+
+ -- Oliver Smith <osmith@sysmocom.de>  Wed, 12 Feb 2025 12:50:57 +0100
+
 osmo-pcap (0.5.0) unstable; urgency=medium
 
   [ Andreas Eversberg ]

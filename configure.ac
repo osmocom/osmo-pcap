@@ -163,12 +163,12 @@ AC_SUBST([PCAP_LIBS])
 AC_SUBST([PCAP_CFLAGS])
 
 dnl checks for libraries
-PKG_CHECK_MODULES(LIBOSMOCORE, libosmocore >= 1.10.0)
+PKG_CHECK_MODULES(LIBOSMOCORE, libosmocore >= 1.11.0)
 # libosmogb: needed for osmocom/gprs includes
-PKG_CHECK_MODULES(LIBOSMOGB, libosmogb >= 1.10.0)
-PKG_CHECK_MODULES(LIBOSMOGSM, libosmogsm >= 1.10.0)
-PKG_CHECK_MODULES(LIBOSMOVTY, libosmovty >= 1.10.0)
-PKG_CHECK_MODULES(LIBOSMONETIF, libosmo-netif >= 1.5.0)
+PKG_CHECK_MODULES(LIBOSMOGB, libosmogb >= 1.11.0)
+PKG_CHECK_MODULES(LIBOSMOGSM, libosmogsm >= 1.11.0)
+PKG_CHECK_MODULES(LIBOSMOVTY, libosmovty >= 1.11.0)
+PKG_CHECK_MODULES(LIBOSMONETIF, libosmo-netif >= 1.6.0)
 PKG_CHECK_MODULES(LIBZMQ, libzmq >= 3.2.2)
 PKG_CHECK_MODULES(LIBGNUTLS, gnutls)
 

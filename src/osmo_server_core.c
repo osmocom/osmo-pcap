@@ -547,8 +547,9 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, struct msgb *msg)
 	rc = osmo_pcap_wr_file_write_msgb(conn->wrf, msg);
 	if (rc < 0) {
 		LOGP(DSERVER, LOGL_ERROR, "%s: Failed writing to file\n", conn->name);
-		/* msgb will be freed by caller */
-		return -1;
+		msgb_free(msg);
+		/* Avoid closing conn. msgb won't be freed by caller */
+		return 0;
 	}
 	update_last_write(conn, now);
 	/* msgb is now owned by conn->wrf. */

@@ -45,6 +45,7 @@ struct rate_ctr_group_desc;
 
 struct osmo_pcap_server;
 
+#define PCAP_SERVER_FILE_WRQUEUE_MAX_LEN 1024
 
 #define STATE_INITIAL	0
 #define STATE_DATA	1
@@ -83,6 +84,8 @@ struct osmo_pcap_wr_file {
 	char *filename;
 	/* file descriptor of the file we write to */
 	struct osmo_io_fd *local_iofd;
+	/* Maximum size of write queue of pcap files being stored on disk: */
+	size_t wr_queue_max_length;
 	/* Current write offset of the file we write to (local_fd) */
 	off_t wr_offset;
 	/* Number of bytes confirmed to be written, <=wr_offset */
@@ -90,6 +93,7 @@ struct osmo_pcap_wr_file {
 	osmo_pcap_wr_file_flush_completed_cb_t flush_completed_cb;
 };
 struct osmo_pcap_wr_file *osmo_pcap_wr_file_alloc(void *ctx, void *data);
+void osmo_pcap_wr_file_set_write_queue_max_length(struct osmo_pcap_wr_file *wrf, size_t max_len);
 void osmo_pcap_wr_file_free(struct osmo_pcap_wr_file *wrf);
 void osmo_pcap_wr_file_set_flush_completed_cb(struct osmo_pcap_wr_file *wrf, osmo_pcap_wr_file_flush_completed_cb_t flush_completed_cb);
 int osmo_pcap_wr_file_open(struct osmo_pcap_wr_file *wrf, const char *filename, mode_t mode);
@@ -184,6 +188,8 @@ struct osmo_pcap_server {
 	off_t max_size;
 	bool max_size_enabled;
 	int max_snaplen;
+	/* Maximum size of write queue of pcap files being stored on disk: */
+	size_t file_wr_queue_max_length;
 
 	struct {
 		bool enabled;

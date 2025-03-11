@@ -100,6 +100,7 @@ static int config_write_server(struct vty *vty)
 	if (pcap_server->completed_path)
 		vty_out(vty, " completed-path %s%s", pcap_server->completed_path, VTY_NEWLINE);
 	vty_out(vty, " file-permission-mask 0%o%s", pcap_server->permission_mask, VTY_NEWLINE);
+	vty_out(vty, " file-write-queue-max-length %zu%s", pcap_server->file_wr_queue_max_length, VTY_NEWLINE);
 	if (pcap_server->addr)
 		vty_out(vty, " server ip %s%s", pcap_server->addr, VTY_NEWLINE);
 	if (pcap_server->port > 0)
@@ -224,6 +225,36 @@ DEFUN(cfg_server_file_permission_mask,
 ret_invalid:
 	vty_out(vty, "%% File permission mask out of range: '%s'%s", argv[0], VTY_NEWLINE);
 	return CMD_WARNING;
+}
+
+DEFUN(cfg_server_file_write_queue_max_length,
+	cfg_server_file_write_queue_max_length_cmd,
+	"file-write-queue-max-length <0-4294967295>",
+	"Configure the write-queue used for storing received pcap data to disk\n"
+	"Maximum amount of packets before dropping starts (default "
+	OSMO_STRINGIFY_VAL(PCAP_SERVER_FILE_WRQUEUE_MAX_LEN) ")\n")
+{
+	struct osmo_pcap_conn *conn;
+	int64_t val;
+
+
+	if (osmo_str_to_int64(&val, argv[0], 10, 0, INT64_MAX)) {
+		vty_out(vty, "%% Error parsing value %s%s", argv[0], VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+
+	pcap_server->file_wr_queue_max_length = (size_t)val;
+
+	llist_for_each_entry(conn, &pcap_server->conn, entry) {
+		if (!conn->wrf)
+			continue;
+		osmo_pcap_wr_file_set_write_queue_max_length(conn->wrf,
+							 pcap_server->file_wr_queue_max_length);
+		/* wrfs in conn->wrf_flushing_list don't need queue size increase
+		 * since anyway they won't get more data enqueued in it. */
+	}
+
+	return CMD_SUCCESS;
 }
 
 DEFUN(cfg_server_ip,
@@ -696,6 +727,7 @@ void vty_server_init(void)
 	install_element(SERVER_NODE, &cfg_server_no_completed_path_cmd);
 	install_element(SERVER_NODE, &cfg_server_completed_path_cmd);
 	install_element(SERVER_NODE, &cfg_server_file_permission_mask_cmd);
+	install_element(SERVER_NODE, &cfg_server_file_write_queue_max_length_cmd);
 	install_element(SERVER_NODE, &cfg_server_ip_cmd);
 	install_element(SERVER_NODE, &cfg_server_port_cmd);
 	install_element(SERVER_NODE, &cfg_server_no_rotate_localtime_cmd);

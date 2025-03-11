@@ -75,6 +75,7 @@ struct osmo_pcap_wr_file *osmo_pcap_wr_file_alloc(void *ctx, void *data)
 	 * list in osmo_pcap_wr_file_is_flushing(): */
 	INIT_LLIST_HEAD(&wrf->entry);
 	wrf->data = data;
+	wrf->wr_queue_max_length = PCAP_SERVER_FILE_WRQUEUE_MAX_LEN;
 	wrf->wr_offset = 0;
 	wrf->wr_completed = 0;
 
@@ -94,6 +95,13 @@ void osmo_pcap_wr_file_free(struct osmo_pcap_wr_file *wrf)
 void osmo_pcap_wr_file_set_flush_completed_cb(struct osmo_pcap_wr_file *wrf, osmo_pcap_wr_file_flush_completed_cb_t flush_completed_cb)
 {
 	wrf->flush_completed_cb = flush_completed_cb;
+}
+
+void osmo_pcap_wr_file_set_write_queue_max_length(struct osmo_pcap_wr_file *wrf, size_t max_len)
+{
+	wrf->wr_queue_max_length = max_len;
+	if (wrf->local_iofd)
+		osmo_iofd_set_txqueue_max_length(wrf->local_iofd, wrf->wr_queue_max_length);
 }
 
 int osmo_pcap_wr_file_open(struct osmo_pcap_wr_file *wrf, const char *filename, mode_t mode)
@@ -117,6 +125,7 @@ int osmo_pcap_wr_file_open(struct osmo_pcap_wr_file *wrf, const char *filename, 
 					  &ioops, wrf);
 	if (!wrf->local_iofd)
 		return -EBADFD;
+	osmo_iofd_set_txqueue_max_length(wrf->local_iofd, wrf->wr_queue_max_length);
 	if (osmo_iofd_register(wrf->local_iofd, -1) < 0) {
 		osmo_iofd_free(wrf->local_iofd);
 		wrf->local_iofd = NULL;

@@ -349,6 +349,7 @@ void osmo_pcap_conn_restart_trace(struct osmo_pcap_conn *conn)
 
 	conn->wrf = osmo_pcap_wr_file_alloc(conn, conn);
 	osmo_pcap_wr_file_set_flush_completed_cb(conn->wrf, osmo_pcap_wr_file_flush_completed_cb);
+	osmo_pcap_wr_file_set_write_queue_max_length(conn->wrf, conn->server->file_wr_queue_max_length);
 	rc = osmo_pcap_wr_file_open(conn->wrf, curr_filename, conn->server->permission_mask);
 	talloc_free(curr_filename);
 	if (rc < 0)
@@ -578,6 +579,7 @@ struct osmo_pcap_server *osmo_pcap_server_alloc(void *ctx)
 	psrv->max_size = 1073741824; /* 1024^3, 1GB **/
 	psrv->max_size_enabled = true;
 	psrv->max_snaplen = DEFAULT_SNAPLEN;
+	psrv->file_wr_queue_max_length = PCAP_SERVER_FILE_WRQUEUE_MAX_LEN;
 	/* By default rotate daily: */
 	psrv->rotate_localtime.enabled = true;
 	psrv->rotate_localtime.intv = TIME_INTERVAL_DAY;

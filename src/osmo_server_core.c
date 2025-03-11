@@ -543,6 +543,13 @@ int osmo_pcap_conn_process_data(struct osmo_pcap_conn *conn, struct msgb *msg)
 	if (!check_restart_pcap_max_size(conn, msgb_length(msg)))
 		check_restart_pcap_localtime(conn, now);
 
+	/* Since the checks above may have closed and re-opened (and could have
+	 * failed), check again whether new wrf is ready... */
+	if (!conn->wrf) {
+		LOGP(DSERVER, LOGL_ERROR, "No file is open. close connection.\n");
+		return -1;
+	}
+
 	talloc_steal(conn->wrf, msg);
 	rc = osmo_pcap_wr_file_write_msgb(conn->wrf, msg);
 	if (rc < 0) {

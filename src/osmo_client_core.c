@@ -277,8 +277,10 @@ int osmo_client_start_capture(struct osmo_pcap_client *client)
 			return rc;
 	}
 
+	/* Restart already initialized pcap files to adapt for new capture parameters: */
 	llist_for_each_entry(conn, &client->conns, entry)
-		osmo_client_conn_send_link(conn);
+		if (osmo_client_conn_is_connected(conn))
+			osmo_client_conn_send_link(conn);
 	return 0;
 }
 

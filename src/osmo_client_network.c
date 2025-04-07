@@ -605,3 +605,17 @@ void osmo_client_conn_disconnect(struct osmo_pcap_client_conn *conn)
 		}
 	}
 }
+
+bool osmo_client_conn_is_connected(const struct osmo_pcap_client_conn *conn)
+{
+	if (conn->tls_on) {
+		/* No socket yet. */
+		if (conn->wqueue.bfd.fd < 0)
+			return false; /* No socket yet. */
+		if (conn->wqueue.bfd.cb == conn_cb_tls)
+			return false; /* Still doing TLS handshake */
+		return true;
+	}
+
+	return conn->cli && osmo_stream_cli_is_connected(conn->cli);
+}

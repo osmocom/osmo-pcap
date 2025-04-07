@@ -149,6 +149,7 @@ void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_disconnect(struct osmo_pcap_client_conn *conn);
 void osmo_client_conn_reconnect(struct osmo_pcap_client_conn *conn);
+bool osmo_client_conn_is_connected(const struct osmo_pcap_client_conn *conn);
 
 
 struct osmo_pcap_handle *osmo_pcap_handle_alloc(struct osmo_pcap_client *client, const char *devname);

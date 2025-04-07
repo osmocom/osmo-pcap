@@ -175,7 +175,9 @@ static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 	struct osmo_pcap_handle *ph = fd->data;
 	int rc;
 
-	rc = pcap_dispatch(ph->handle, 1, pcap_read_one_cb, (u_char *)ph);
+	/* Read up to 10 packets at once, to avoid starving the event loop and
+	 * filling up transmit queue towards peer. */
+	rc = pcap_dispatch(ph->handle, 10, pcap_read_one_cb, (u_char *)ph);
 	if (rc < 0) {
 		rate_ctr_inc2(ph->ctrg, PH_CTR_PERR);
 		rate_ctr_inc2(ph->client->ctrg, CLIENT_CTR_PERR);

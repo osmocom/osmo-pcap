@@ -25,6 +25,7 @@
 #include <osmo-pcap/common.h>
 
 #include <osmocom/core/talloc.h>
+#include <osmocom/netif/stream.h>
 
 #include <stdlib.h>
 
@@ -262,12 +263,12 @@ DEFUN(cfg_enable_tls,
 {
 	struct osmo_pcap_client_conn *conn = get_conn(vty);
 
-	if (!conn->tls_on) {
-		if (conn->wqueue.bfd.fd >= 0)
-			osmo_client_conn_reconnect(conn);
-	}
+	if (conn->tls_on)
+		return CMD_SUCCESS;
 
+	osmo_client_conn_disconnect(conn);
 	conn->tls_on = true;
+	osmo_client_conn_connect(conn);
 	return CMD_SUCCESS;
 }
 
@@ -278,10 +279,12 @@ DEFUN(cfg_disable_tls,
 {
 	struct osmo_pcap_client_conn *conn = get_conn(vty);
 
-	if (conn->tls_on)
-		osmo_client_conn_reconnect(conn);
+	if (!conn->tls_on)
+		return CMD_SUCCESS;
 
+	osmo_client_conn_disconnect(conn);
 	conn->tls_on = false;
+	osmo_client_conn_connect(conn);
 	return CMD_SUCCESS;
 }
 
@@ -568,6 +571,10 @@ DEFUN(cfg_wqueue_maxlength,
 	struct osmo_pcap_client_conn *conn = get_conn(vty);
 
 	conn->wqueue.max_length = atoi(argv[0]);
+	/* Apply on conn immediately if already created: */
+	if (conn->cli)
+		osmo_stream_cli_set_tx_queue_max_length(conn->cli, conn->wqueue.max_length);
+
 	return CMD_SUCCESS;
 }
 

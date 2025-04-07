@@ -32,6 +32,8 @@
 #include <osmocom/core/select.h>
 #include <osmocom/core/socket.h>
 
+#include <osmocom/netif/stream.h>
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -61,13 +63,26 @@ static void lost_connection(struct osmo_pcap_client_conn *conn)
 
 static void write_data(struct osmo_pcap_client_conn *conn, struct msgb *msg)
 {
-	if (osmo_wqueue_enqueue_quiet(&conn->wqueue, msg) != 0) {
-		LOGCONN(conn, LOGL_ERROR, "Failed to enqueue msg (capacity: %u/%u)\n",
-			conn->wqueue.current_length, conn->wqueue.max_length);
+	if (conn->tls_on) {
+		if (osmo_wqueue_enqueue_quiet(&conn->wqueue, msg) != 0) {
+			LOGCONN(conn, LOGL_ERROR, "Failed to enqueue msg (capacity: %u/%u)\n",
+				conn->wqueue.current_length, conn->wqueue.max_length);
+			rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_QERR);
+			msgb_free(msg);
+		}
+		return;
+	}
+
+	if (!conn->cli) {
+		LOGCONN(conn, LOGL_NOTICE, "Failed to enqueue msg (no stream)\n");
 		rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_QERR);
 		msgb_free(msg);
 		return;
 	}
+	osmo_stream_cli_send(conn->cli, msg);
+	/* FIXME: osmo_stream_cli_send() doesn't have a rc, hence we can't ever increment on error:
+	 * rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_QERR);
+	 */
 }
 
 static int read_cb(struct osmo_fd *fd)
@@ -119,7 +134,7 @@ static void tls_error_cb(struct osmo_tls_session *session)
 	lost_connection(conn);
 }
 
-int conn_cb(struct osmo_fd *fd, unsigned int what)
+int conn_cb_tls(struct osmo_fd *fd, unsigned int what)
 {
 	/* finally the socket is connected... continue */
 	if (what & OSMO_FD_WRITE) {
@@ -128,22 +143,15 @@ int conn_cb(struct osmo_fd *fd, unsigned int what)
 		 * The write queue needs to work differently for GNUtls. Before we can
 		 * send data we will need to complete handshake.
 		 */
-		if (conn->tls_on) {
-			if (!osmo_tls_init_client_session(conn)) {
-				lost_connection(conn);
-				return -1;
-			}
-			conn->tls_session.handshake_done = handshake_done_cb;
-			conn->tls_session.error = tls_error_cb;
-
-			/* fd->data now points somewhere else, stop */
-			return 0;
-		} else {
-			conn->wqueue.bfd.cb = osmo_wqueue_bfd_cb;
-			conn->wqueue.bfd.data = conn;
-			osmo_wqueue_clear(&conn->wqueue);
-			osmo_client_conn_send_link(conn);
+		if (!osmo_tls_init_client_session(conn)) {
+			lost_connection(conn);
+			return -1;
 		}
+		conn->tls_session.handshake_done = handshake_done_cb;
+		conn->tls_session.error = tls_error_cb;
+
+		/* fd->data now points somewhere else, stop */
+		return 0;
 	}
 
 	if (what & OSMO_FD_READ)
@@ -446,14 +454,12 @@ void osmo_client_conn_send_link(struct osmo_pcap_client_conn *conn)
 	write_data(conn, msg);
 }
 
-void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn)
+static void osmo_client_conn_connect_tls(struct osmo_pcap_client_conn *conn)
 {
 	int rc;
 	uint16_t srv_port;
 	int sock_type, sock_proto;
 	unsigned int when;
-
-	osmo_client_conn_disconnect(conn);
 
 	conn->wqueue.read_cb = read_cb;
 	conn->wqueue.write_cb = write_cb;
@@ -484,8 +490,93 @@ void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn)
 		lost_connection(conn);
 		return;
 	}
-	osmo_fd_setup(&conn->wqueue.bfd, rc, when, conn_cb, conn, 0);
+	osmo_fd_setup(&conn->wqueue.bfd, rc, when, conn_cb_tls, conn, 0);
 	osmo_fd_register(&conn->wqueue.bfd);
+
+	rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_CONNECT);
+}
+
+static int stream_cli_connect_cb(struct osmo_stream_cli *cli)
+{
+	struct osmo_pcap_client_conn *conn = osmo_stream_cli_get_data(cli);
+	osmo_client_conn_send_link(conn);
+	return 0;
+}
+
+static int stream_cli_disconnect_cb(struct osmo_stream_cli *cli)
+{
+	struct osmo_pcap_client_conn *conn = osmo_stream_cli_get_data(cli);
+	lost_connection(conn);
+	return 0;
+}
+
+static int stream_cli_read_cb(struct osmo_stream_cli *cli, int res, struct msgb *msg)
+{
+	struct osmo_pcap_client_conn *conn = osmo_stream_cli_get_data(cli);
+
+	msgb_free(msg);
+	if (res <= 0) {
+		LOGCONN(conn, LOGL_ERROR, "Lost connection on read\n");
+		lost_connection(conn);
+	}
+	return 0;
+}
+
+void osmo_client_conn_connect(struct osmo_pcap_client_conn *conn)
+{
+	uint16_t srv_port;
+	int sock_type, sock_proto;
+	struct osmo_stream_cli *cli;
+
+	osmo_client_conn_disconnect(conn);
+
+	/* We still don't support the tls layer through osmo_stream... */
+	if (conn->tls_on) {
+		osmo_client_conn_connect_tls(conn);
+		return;
+	}
+
+	switch (conn->protocol) {
+	case PROTOCOL_OSMOPCAP:
+		srv_port = conn->srv_port;
+		sock_type = SOCK_STREAM;
+		sock_proto = IPPROTO_TCP;
+		break;
+	case PROTOCOL_IPIP:
+		srv_port = 0;
+		sock_type = SOCK_RAW;
+		sock_proto = IPPROTO_IPIP;
+		break;
+	default:
+		OSMO_ASSERT(0);
+		break;
+	}
+
+	OSMO_ASSERT(!conn->cli);
+	conn->cli = cli = osmo_stream_cli_create(conn);
+	osmo_stream_cli_set_name(cli, conn->name);
+	osmo_stream_cli_set_data(cli, conn);
+	osmo_stream_cli_set_type(cli, sock_type);
+	osmo_stream_cli_set_proto(cli, sock_proto);
+	osmo_stream_cli_set_local_addr(cli, conn->source_ip);
+	osmo_stream_cli_set_local_port(cli, 0);
+	osmo_stream_cli_set_addr(cli, conn->srv_ip);
+	osmo_stream_cli_set_port(cli, srv_port);
+	osmo_stream_cli_set_nodelay(cli, true);
+	osmo_stream_cli_set_tx_queue_max_length(cli, conn->wqueue.max_length);
+
+	/* Reconnect is handled by upper layers: */
+	osmo_stream_cli_set_reconnect_timeout(cli, -1);
+	osmo_stream_cli_set_connect_cb(cli, stream_cli_connect_cb);
+	osmo_stream_cli_set_disconnect_cb(cli, stream_cli_disconnect_cb);
+	osmo_stream_cli_set_read_cb2(cli, stream_cli_read_cb);
+
+	if (osmo_stream_cli_open(cli)) {
+		LOGCONN(conn, LOGL_ERROR, "Failed opening connection: %s\n", strerror(errno));
+		conn->cli = NULL;
+		osmo_stream_cli_destroy(cli);
+		return;
+	}
 
 	rate_ctr_inc2(conn->client->ctrg, CLIENT_CTR_CONNECT);
 }
@@ -497,12 +588,20 @@ void osmo_client_conn_reconnect(struct osmo_pcap_client_conn *conn)
 
 void osmo_client_conn_disconnect(struct osmo_pcap_client_conn *conn)
 {
-	if (conn->wqueue.bfd.fd >= 0) {
-		osmo_tls_release(&conn->tls_session);
-		osmo_fd_unregister(&conn->wqueue.bfd);
-		close(conn->wqueue.bfd.fd);
-		conn->wqueue.bfd.fd = -1;
-	}
-
 	osmo_timer_del(&conn->timer);
+
+	if (conn->tls_on) {
+		if (conn->wqueue.bfd.fd >= 0) {
+			osmo_tls_release(&conn->tls_session);
+			osmo_fd_unregister(&conn->wqueue.bfd);
+			close(conn->wqueue.bfd.fd);
+			conn->wqueue.bfd.fd = -1;
+		}
+	} else {
+		if (conn->cli) {
+			struct osmo_stream_cli *cli = conn->cli;
+			conn->cli = NULL;
+			osmo_stream_cli_destroy(cli);
+		}
+	}
 }

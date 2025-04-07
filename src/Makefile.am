@@ -26,6 +26,7 @@ osmo_pcap_client_SOURCES = \
 	$(NULL)
 
 osmo_pcap_client_LDADD = \
+	$(LIBOSMONETIF_LIBS) \
 	$(LIBOSMOGSM_LIBS) \
 	$(LIBOSMOVTY_LIBS) \
 	$(LIBOSMOCORE_LIBS) \

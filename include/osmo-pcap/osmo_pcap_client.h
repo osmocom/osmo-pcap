@@ -70,7 +70,7 @@ struct osmo_pcap_client_conn {
 	char *srv_ip;
 	int srv_port;
 	char *source_ip;
-	struct osmo_wqueue wqueue;
+	struct osmo_stream_cli *cli;
 	struct osmo_timer_list timer;
 	enum osmo_pcap_protocol protocol;
 
@@ -87,6 +87,7 @@ struct osmo_pcap_client_conn {
 	unsigned tls_log_level;
 
 	struct osmo_tls_session tls_session;
+	struct osmo_wqueue wqueue;
 
 	/* back pointer */
 	struct osmo_pcap_client *client;

@@ -119,7 +119,7 @@ static int config_write_server(struct vty *vty)
 	else
 		vty_out(vty, " no max-file-size%s", VTY_NEWLINE);
 	if (pcap_server->max_snaplen != DEFAULT_SNAPLEN)
-		vty_out(vty, " server max-snaplen %d%s", pcap_server->max_snaplen, VTY_NEWLINE);
+		vty_out(vty, " max-snaplen %d%s", pcap_server->max_snaplen, VTY_NEWLINE);
 	if (pcap_server->zmq_port > 0)
 		vty_out(vty, " zeromq-publisher %s %d%s",
 			pcap_server->zmq_ip, pcap_server->zmq_port, VTY_NEWLINE);

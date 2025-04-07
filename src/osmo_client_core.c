@@ -101,9 +101,9 @@ static int check_gprs(const u_char *data, bpf_u_int32 len)
 }
 
 static int can_forward_packet(
-			struct osmo_pcap_client *client,
-			struct osmo_pcap_handle *ph,
-			struct pcap_pkthdr *hdr,
+			const struct osmo_pcap_client *client,
+			const struct osmo_pcap_handle *ph,
+			const struct pcap_pkthdr *hdr,
 			const u_char *data)
 {
 	int ll_type;

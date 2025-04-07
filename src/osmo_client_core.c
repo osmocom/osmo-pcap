@@ -152,27 +152,36 @@ static int can_forward_packet(
 	return check_gprs(payload_data, payload_len);
 }
 
+static void pcap_read_one_cb(u_char *user, const struct pcap_pkthdr *hdr, const u_char *data)
+{
+	struct osmo_pcap_handle *ph = (struct osmo_pcap_handle *)user;
+	struct osmo_pcap_client *client = ph->client;
+	struct osmo_pcap_client_conn *conn;
+
+	/* NOTE: hdr & data are only available during the call of this callback,
+	 * and should be copied somewhere else if need be accessed later.
+	 * In here we are fine since we generate a msgb and copy over the
+	 * content on each loop iteration below. */
+
+	if (!can_forward_packet(client, ph, hdr, data))
+		return;
+
+	llist_for_each_entry(conn, &client->conns, entry)
+		osmo_client_conn_send_data(conn, ph, hdr, data);
+}
 
 static int pcap_read_cb(struct osmo_fd *fd, unsigned int what)
 {
 	struct osmo_pcap_handle *ph = fd->data;
-	struct osmo_pcap_client *client = ph->client;
-	struct osmo_pcap_client_conn *conn;
-	struct pcap_pkthdr hdr;
-	const u_char *data;
+	int rc;
 
-	data = pcap_next(ph->handle, &hdr);
-	if (!data) {
+	rc = pcap_dispatch(ph->handle, 1, pcap_read_one_cb, (u_char *)ph);
+	if (rc < 0) {
 		rate_ctr_inc2(ph->ctrg, PH_CTR_PERR);
-		rate_ctr_inc2(client->ctrg, CLIENT_CTR_PERR);
+		rate_ctr_inc2(ph->client->ctrg, CLIENT_CTR_PERR);
 		return -1;
 	}
 
-	if (!can_forward_packet(client, ph, &hdr, data))
-		return 0;
-
-	llist_for_each_entry(conn, &client->conns, entry)
-		osmo_client_conn_send_data(conn, ph, &hdr, data);
 	return 0;
 }
 
@@ -448,6 +457,13 @@ int osmo_pcap_handle_start_capture(struct osmo_pcap_handle *ph)
 		return -2;
 	}
 
+	if (client->filter_string)
+		osmo_pcap_handle_install_filter(ph);
+
+	errbuf[0] = '\0';
+	if (pcap_setnonblock(ph->handle, 1, errbuf) != 0)
+		LOGPH(ph, LOGL_ERROR, "Failed pcap_setnonblock(): %s\n", errbuf);
+
 	fd = pcap_fileno(ph->handle);
 	if (fd == -1) {
 		LOGPH(ph, LOGL_ERROR, "No file descriptor provided.\n");
@@ -463,7 +479,5 @@ int osmo_pcap_handle_start_capture(struct osmo_pcap_handle *ph)
 	osmo_timer_setup(&ph->pcap_stat_timer, pcap_check_stats_cb, ph);
 	pcap_check_stats_cb(ph);
 
-	if (client->filter_string)
-		osmo_pcap_handle_install_filter(ph);
 	return 0;
 }

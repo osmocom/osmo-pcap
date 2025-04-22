@@ -1,3 +1,14 @@
+osmo-pcap (0.8.0) unstable; urgency=medium
+
+  * server: vty: Fix writing config max-snaplen param
+  * client: use osmo_stream_cli to transmit data to pcap-server
+  * client: Avoid sending link frame over non-connected conn
+  * client: constify args in can_forward_packet()
+  * client: use pcap_dispatch to avoid extra pkt buffer copy
+  * client: Process up to 10 recorded pkts per poll iteration
+
+ -- Pau Espin Pedrol <pespin@sysmocom.de>  Tue, 22 Apr 2025 16:44:37 +0200
+
 osmo-pcap (0.7.0) unstable; urgency=medium
 
   * Drop use of deprecated vty is_config_node() cb

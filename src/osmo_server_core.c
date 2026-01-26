@@ -393,7 +393,7 @@ static bool check_restart_pcap_max_size(struct osmo_pcap_conn *conn, size_t data
 	if (conn->wrf->wr_offset + data_len <= conn->server->max_size)
 		return false;
 
-	LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s (max-size)\n", conn->name);
+	LOGP(DSERVER, LOGL_NOTICE, "Rolling over file for %s (max-file-size)\n", conn->name);
 	osmo_pcap_conn_restart_trace(conn);
 	return true;
 }

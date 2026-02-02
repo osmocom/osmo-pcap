@@ -125,7 +125,14 @@ int osmo_pcap_wr_file_open(struct osmo_pcap_wr_file *wrf, const char *filename, 
 					  &ioops, wrf);
 	if (!wrf->local_iofd)
 		return -EBADFD;
+
 	osmo_iofd_set_txqueue_max_length(wrf->local_iofd, wrf->wr_queue_max_length);
+
+	/* Request to use 8 write buffers, or less if not as many are available: */
+	rc = osmo_iofd_set_io_buffers(wrf->local_iofd, OSMO_IO_OP_WRITE, 0);
+	if (rc > 0)
+		osmo_iofd_set_io_buffers(wrf->local_iofd, OSMO_IO_OP_WRITE, OSMO_MIN(rc, 8));
+
 	if (osmo_iofd_register(wrf->local_iofd, -1) < 0) {
 		osmo_iofd_free(wrf->local_iofd);
 		wrf->local_iofd = NULL;
